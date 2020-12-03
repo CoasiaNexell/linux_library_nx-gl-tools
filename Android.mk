@@ -1,70 +1,67 @@
-LOCAL_PATH		:= $(call my-dir)
+LOCAL_PATH := $(call my-dir)
 
-NX_INC_TOP		:= $(LOCAL_PATH)/../include
-NX_LIB_TOP		:= $(LOCAL_PATH)/../lib/android
+NX_INC_TOP		:= $(LOCAL_PATH)/include
+NX_LIB_TOP		:= $(LOCAL_PATH)/lib/android
 
 include $(CLEAR_VARS)
 LOCAL_MODULE    := libnxgpusurf
-LOCAL_MODULE_CLASS := STATIC_LIBRARIES
-LOCAL_MODULE_SUFFIX := .a
+LOCAL_MODULE_CLASS := SHARED_LIBRARIES
+LOCAL_MODULE_SUFFIX := .so
 LOCAL_C_INCLUDE := $(NX_INC_TOP)
-LOCAL_SRC_FILES := /../lib/android/libnxgpusurf_dbg.a
+LOCAL_SRC_FILES := /lib/android/libnxgpusurf.so
+ifeq ($(ANDROID_VERSION), 9)
+LOCAL_VENDOR_MODULE := true
+endif
 include $(BUILD_PREBUILT)
 
 
 include $(CLEAR_VARS)
 
-#########################################################################
-#																		#
-#								Includes								#
-#																		#
-#########################################################################
+ANDROID_VERSION_STR := $(subst ., ,$(PLATFORM_VERSION))
+ANDROID_VERSION := $(firstword $(ANDROID_VERSION_STR))
+
+#
+#	Compile Options
+#
+LOCAL_CFLAGS 		:= -DANDROID -pthread -DGL_GLEXT_PROTOTYPES -DNX_PLATFORM_DRM_USER_ALLOC_USE -DNX_DEBUG
+
+LOCAL_C_INCLUDES := \
+	$(NX_INC_TOP)
+
 LOCAL_C_INCLUDES +=	\
 	external/libdrm \
 	hardware/nexell/s5pxx18/gralloc	\
+	frameworks/native/opengl/include	\
 	$(NX_INC_TOP) \
 	$(NX_INC_TOP)/drm \
 	$(LOCAL_PATH)
 
-#########################################################################
-#																		#
-#								Sources									#
-#																		#
-#########################################################################
-LOCAL_SRC_FILES		+=		\
-	common.cpp \
-	main.cpp \
-	main_cam_cvt.cpp \
-	main_cam_cvt_sequence.cpp \
-	main_mem_cvt.cpp \
-	main_mem_cvt_format.cpp
+LOCAL_LDFLAGS := \
+    -Wl,--rpath,\$${ORIGIN}/../../../vendor/lib/egl -Wl
 
-#########################################################################
-#																		#
-#								Library									#
-#																		#
-#########################################################################
+LOCAL_SHARED_LIBRARIES :=	\
+	liblog 		\
+	libutils \
+	libcutils \
+	libdrm \
+	libnx_renderer \
+	libnx_v4l2 \
+	libnxgpusurf
 
-#LOCAL_FORCE_STATIC_EXECUTABLE := true
-
-LOCAL_STATIC_LIBRARIES += liblog
-LOCAL_STATIC_LIBRARIES += libnxgpusurf
-LOCAL_STATIC_LIBRARIES += libdrm libnx_renderer libnx_v4l2
+LOCAL_SRC_FILES := \
+	nx_gl_tools.cpp
 
 LOCAL_LDLIBS += -lGLES_mali
-#LOCAL_SHARED_LIBRARIES += libGLES_mali
 
+LOCAL_32_BIT_ONLY := true
 
-#########################################################################
-#																		#
-#								Target									#
-#																		#
-#########################################################################
-LOCAL_MODULE		:= NxGpuSurf
-LOCAL_MODULE_TAGS	:= optional
-LOCAL_CFLAGS 		:= -DANDROID -pthread -DGL_GLEXT_PROTOTYPES -DNX_PLATFORM_DRM_USER_ALLOC_USE -DNX_DEBUG
-LOCAL_MODULE_PATH := $(TARGET_ROOT_OUT_SBIN)
-LOCAL_UNSTRIPPED_PATH := $(TARGET_ROOT_OUT_SBIN_UNSTRIPPED)
-LOCAL_POST_INSTALL_CMD := $(hide) mkdir -p $(TARGET_ROOT_OUT)/sbin
+LOCAL_MODULE := libnx_gl_tools
 
-include $(BUILD_EXECUTABLE)
+ifeq ($(ANDROID_VERSION), 9)
+LOCAL_VENDOR_MODULE := true
+LOCAL_CFLAGS += -DPIE
+else
+LOCAL_MODULE_TAGS := optional
+endif
+
+include $(BUILD_SHARED_LIBRARY)
