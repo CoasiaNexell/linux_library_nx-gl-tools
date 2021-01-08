@@ -36,8 +36,7 @@ LOCAL_C_INCLUDES +=	\
 	$(NX_INC_TOP)/drm \
 	$(LOCAL_PATH)
 
-LOCAL_LDFLAGS := \
-    -Wl,--rpath,\$${ORIGIN}/../../../vendor/lib/egl -Wl
+LOCAL_LDFLAGS := -Wl,--rpath,\$${ORIGIN}/../../../vendor/lib -Wl
 
 LOCAL_SHARED_LIBRARIES :=	\
 	liblog 		\

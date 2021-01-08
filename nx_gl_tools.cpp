@@ -531,7 +531,6 @@ void NX_GlDeinterlaceDeInit(void *pHandle)
 	}
 }
 
-#ifdef PIE
 //------------------------------------------------------------------------------
 //
 //    MemCopy Functions
@@ -727,5 +726,3 @@ void NX_GlMemCopyDeInit(void *pHandle)
 		free(pMemCopyHANDLE);
 	}
 }
-#endif
-

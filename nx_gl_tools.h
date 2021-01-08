@@ -121,7 +121,6 @@ int32_t NX_GlDeinterlaceRun(void *pHandle, int32_t* pSrcDmaFd, int32_t *pDstDmaF
 void NX_GlDeinterlaceDeInit(void *pHandle);
 
 
-#ifdef PIE
 //------------------------------------------------------------------------------
 //
 //    MemCopy Functions
@@ -160,6 +159,4 @@ void NX_GlMemCopyDeInit(void *pHandle);
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif
