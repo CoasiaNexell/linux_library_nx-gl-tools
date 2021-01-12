@@ -36,7 +36,7 @@ LOCAL_C_INCLUDES +=	\
 	$(NX_INC_TOP)/drm \
 	$(LOCAL_PATH)
 
-LOCAL_LDFLAGS := -Wl,--rpath,\$${ORIGIN}/../../../vendor/lib -Wl
+LOCAL_LDLIBS += -lGLES_mali
 
 LOCAL_SHARED_LIBRARIES :=	\
 	liblog 		\
@@ -49,8 +49,6 @@ LOCAL_SHARED_LIBRARIES :=	\
 
 LOCAL_SRC_FILES := \
 	nx_gl_tools.cpp
-
-LOCAL_LDLIBS += -lGLES_mali
 
 LOCAL_32_BIT_ONLY := true
 
