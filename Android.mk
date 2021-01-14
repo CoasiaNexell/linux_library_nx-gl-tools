@@ -48,7 +48,10 @@ LOCAL_SHARED_LIBRARIES :=	\
 	libnxgpusurf
 
 LOCAL_SRC_FILES := \
-	nx_gl_tools.cpp
+	nx_gl_tools.cpp \
+	gl_service.cpp \
+	NX_Queue.cpp \
+	NX_Semaphore.cpp
 
 LOCAL_32_BIT_ONLY := true
 
