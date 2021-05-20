@@ -16,7 +16,7 @@
 #ifndef __NX_GlTOOL_H__
 #define __NX_GlTOOL_H__
 
-//#include <stdint.h>
+#include <stdint.h>
 
 //------------------------------------------------------------------------------
 //
@@ -64,7 +64,8 @@ extern "C" {
 * @param[in]		dstOutBufNum			destination buffer number
 * @return if not null on success(handle), null on failure
 */
-void *NX_GlRotateInit(uint32_t srcWidth, uint32_t srcHeight, uint32_t dstWidth, uint32_t dstHeight, int32_t (*pDstDmaFd)[3], int32_t srcImageFormat, int32_t dstOutBufNum);
+void *NX_GlRotateInit(uint32_t srcWidth, uint32_t srcHeight, uint32_t dstWidth, uint32_t dstHeight,
+					  int (*pDstDmaFd)[3], uint32_t srcImageFormat, uint32_t dstOutBufNum);
 
 /**
 * NX_GlRotateRun.
@@ -75,7 +76,7 @@ void *NX_GlRotateInit(uint32_t srcWidth, uint32_t srcHeight, uint32_t dstWidth, 
 * @param[in]		rotateMode			rotateMode
 * @return 0 on success, negative error on failure
 */
-int32_t NX_GlRotateRun(void *pHandle, int32_t* pSrcDmaFd, int32_t *pDstDmaFd, int32_t rotateMode);
+int NX_GlRotateRun(void *pHandle, int *pSrcDmaFd, int *pDstDmaFd, uint32_t rotateMode);
 
 /**
 * NX_GlRotateDeInit.
@@ -101,17 +102,20 @@ void NX_GlRotateDeInit(void *pHandle);
 * @param[in]		dstOutBufNum			destination buffer number
 * @return if not null on success(handle), null on failure
 */
-void *NX_GlDeinterlaceInit(uint32_t srcWidth, uint32_t srcHeight, uint32_t dstWidth, uint32_t dstHeight, int32_t (*pDstDmaFd)[3], int32_t srcImageFormat, int32_t dstOutBufNum);
+void *NX_GlDeinterlaceInit(uint32_t srcWidth, uint32_t srcHeight,
+						   uint32_t dstWidth, uint32_t dstHeight,
+						   int (*pDstDmaFd)[3], uint32_t srcImageFormat, uint32_t dstOutBufNum);
 
 /**
 * NX_GlDeinterlaceRun.
 *
 * @param[in]		*pHandle			handle
-* @param[in]		*pSrcDmaFd			source height
-* @param[in]		*pDstDmaFd			destination width
+* @param[in]		*pSrcDmaFd			current frame's fds
+* @param[in]		*pSrcNDmaFd			nexet frame's fds
+* @param[in]		*pDstDmaFd			destination frame's fds
 * @return 0 on success, negative error on failure
 */
-int32_t NX_GlDeinterlaceRun(void *pHandle, int32_t* pSrcDmaFd, int32_t *pDstDmaFd);
+int NX_GlDeinterlaceRun(void *pHandle, int* pSrcDmaFd, int* pSrcNDmaFds, int *pDstDmaFd);
 
 /**
 * NX_GlDeinterlaceDeInit.
@@ -121,7 +125,6 @@ int32_t NX_GlDeinterlaceRun(void *pHandle, int32_t* pSrcDmaFd, int32_t *pDstDmaF
 void NX_GlDeinterlaceDeInit(void *pHandle);
 
 
-#ifdef PIE
 //------------------------------------------------------------------------------
 //
 //    MemCopy Functions
@@ -130,14 +133,14 @@ void NX_GlDeinterlaceDeInit(void *pHandle);
 /**
 * NX_GlMemCopyInit.
 *
-* @param[in]		Width				width
-* @param[in]		Height				height
+* @param[in]		width				width
+* @param[in]		height				height
 * @param[in]		(*pDstDmaFd)[3]			destination dmaFd
-* @param[in]		ImageFormat			source imageFormat
+* @param[in]		imageFormat			source imageFormat
 * @param[in]		dstOutBufNum			destination buffer number
 * @return if not null on success(handle), null on failure
 */
-void *NX_GlMemCopyInit(uint32_t Width, uint32_t height, int32_t (*pDstDmaFd)[3], int32_t ImageFormat, int32_t dstOutBufNum);
+void *NX_GlMemCopyInit(uint32_t width, uint32_t height, int (*pDstDmaFd)[3], uint32_t imageFormat, int32_t dstOutBufNum);
 
 /**
 * NX_GlMemCopyRun.
@@ -148,7 +151,7 @@ void *NX_GlMemCopyInit(uint32_t Width, uint32_t height, int32_t (*pDstDmaFd)[3],
 * @param[in]		rotateMode			rotateMode
 * @return 0 on success, negative error on failure
 */
-int32_t NX_GlMemCopyRun(void *pHandle, int32_t* pSrcDmaFd, int32_t *pDstDmaFd);
+int NX_GlMemCopyRun(void *pHandle, int *pSrcDmaFd, int *pDstDmaFd);
 
 /**
 * NX_GlMemCopyDeInit.
@@ -160,6 +163,4 @@ void NX_GlMemCopyDeInit(void *pHandle);
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif

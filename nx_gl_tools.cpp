@@ -52,17 +52,17 @@ typedef struct
 	HGSURFCTRL 		ghAppGSurfCtrl;
 	HGSURFSOURCE 	ghAppGSurfSource[MAX_BUFFER_NUM];
 	HGSURFTARGET 	ghAppGSurfTarget[MAX_BUFFER_NUM];
-	int32_t			srcImageFormat;
-	int32_t			dstImageFormat;
-	int32_t 		srcDmaFd[MAX_BUFFER_NUM];
+	uint32_t		srcImageFormat;
+	uint32_t		dstImageFormat;
+	int				srcDmaFd[MAX_BUFFER_NUM];
 	int32_t 		srcDmaBufNum;
-	int32_t 		dstDmaFd[MAX_BUFFER_NUM];
-	int32_t 		dstDmaBufNum;
+	int				dstDmaFd[MAX_BUFFER_NUM];
+	uint32_t 		dstDmaBufNum;
 	uint32_t 		srcWidth;
 	uint32_t 		srcHeight;
 	uint32_t 		dstWidth;
 	uint32_t 		dstHeight;
-	int32_t			dstOutBufNum;
+	uint32_t		dstOutBufNum;
 } NX_GL_HANDLE;
 
 static int32_t FindSrcDmaFdIndex(NX_GL_HANDLE *pGlHANDLE, int32_t srcDmaFd)
@@ -146,7 +146,7 @@ static unsigned int vmem_get_size(unsigned int width, unsigned int height,
 	return bytes_size;
 }
 
-void *NX_GlRotateInit(uint32_t srcWidth, uint32_t srcHeight, uint32_t dstWidth, uint32_t dstHeight, int32_t (*pDstDmaFd)[3], int32_t srcImageFormat, int32_t dstOutBufNum)
+void *NX_GlRotateInit(uint32_t srcWidth, uint32_t srcHeight, uint32_t dstWidth, uint32_t dstHeight, int (*pDstDmaFd)[3], uint32_t srcImageFormat, uint32_t dstOutBufNum)
 {
 	NX_GSURF_VMEM_IMAGE_FORMAT_MODE glSrcFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420;
 	NX_GSURF_VMEM_IMAGE_FORMAT_MODE glDstFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420;
@@ -332,11 +332,10 @@ void NX_GlRotateDeInit(void *pHandle)
 //    Deinterlace Functions
 //    memory to memory
 //------------------------------------------------------------------------------
-void *NX_GlDeinterlaceInit(uint32_t srcWidth, uint32_t srcHeight, uint32_t dstWidth, uint32_t dstHeight, int32_t (*pDstDmaFd)[3], int32_t srcImageFormat, int32_t dstOutBufNum)
+void *NX_GlDeinterlaceInit(uint32_t srcWidth, uint32_t srcHeight, uint32_t dstWidth, uint32_t dstHeight, int32_t (*pDstDmaFd)[3], uint32_t srcImageFormat, uint32_t dstOutBufNum)
 {
-	NX_GSURF_VMEM_IMAGE_FORMAT_MODE glSrcFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_INTERLACE;
-	NX_GSURF_VMEM_IMAGE_FORMAT_MODE glDstFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_INTERLACE;
-
+	NX_GSURF_VMEM_IMAGE_FORMAT_MODE glSrcFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_EVEN_ODD_INTERLACE;
+	NX_GSURF_VMEM_IMAGE_FORMAT_MODE glDstFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_EVEN_ODD_INTERLACE;
 	int32_t bRet = false;
 
 	NX_GL_HANDLE *pDeinterlace_HANDLE = (NX_GL_HANDLE *)malloc(sizeof(NX_GL_HANDLE));
@@ -353,10 +352,6 @@ void *NX_GlDeinterlaceInit(uint32_t srcWidth, uint32_t srcHeight, uint32_t dstWi
 	{
 		pDeinterlace_HANDLE->srcImageFormat = srcImageFormat;
 		pDeinterlace_HANDLE->dstImageFormat = srcImageFormat;
-
-		glSrcFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_INTERLACE;
-		glDstFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_INTERLACE;
-
 	}
 	else
 	{
@@ -388,19 +383,16 @@ void *NX_GlDeinterlaceInit(uint32_t srcWidth, uint32_t srcHeight, uint32_t dstWi
 	}
 
 	//create target
-	unsigned int gRenderWidth = pDeinterlace_HANDLE->dstWidth;
-	unsigned int gRenderHeight = pDeinterlace_HANDLE->dstHeight;
-
 	for (int i = 0 ; i < dstOutBufNum ; i++)
 	{
 		//create GSurf target handle
 		if(pDeinterlace_HANDLE->srcImageFormat == V4L2_PIX_FMT_YUV420)
 		{
-			pDeinterlace_HANDLE->ghAppGSurfTarget[i] = nxGSurfaceCreateDeinterlaceTarget(pDeinterlace_HANDLE->ghAppGSurfCtrl, gRenderWidth, gRenderHeight, pDstDmaFd[i][0]);
+			pDeinterlace_HANDLE->ghAppGSurfTarget[i] = nxGSurfaceCreateDeinterlaceTarget(pDeinterlace_HANDLE->ghAppGSurfCtrl, dstWidth, dstHeight, pDstDmaFd[i][0]);
 		}
 		else if(pDeinterlace_HANDLE->srcImageFormat == V4L2_PIX_FMT_YUV420M)
 		{
-			pDeinterlace_HANDLE->ghAppGSurfTarget[i] = nxGSurfaceCreateDeinterlaceTargetWithFDs(pDeinterlace_HANDLE->ghAppGSurfCtrl, gRenderWidth, gRenderHeight, pDstDmaFd[i]);
+			pDeinterlace_HANDLE->ghAppGSurfTarget[i] = nxGSurfaceCreateDeinterlaceTargetWithFDs(pDeinterlace_HANDLE->ghAppGSurfCtrl, dstWidth, dstHeight, pDstDmaFd[i]);
 		}
 		else
 		{
@@ -419,10 +411,13 @@ void *NX_GlDeinterlaceInit(uint32_t srcWidth, uint32_t srcHeight, uint32_t dstWi
 		return NULL;
 	}	
 
+	//Ready Deinterlace
+	nxGSurfaceReadyDeinterlace(pDeinterlace_HANDLE->ghAppGSurfCtrl);
+
 	return (void *)pDeinterlace_HANDLE;
 }
 
-int32_t NX_GlDeinterlaceRun(void *pHandle, int32_t* pSrcDmaFd, int32_t *pDstDmaFd)
+int32_t NX_GlDeinterlaceRun(void *pHandle, int32_t* pSrcDmaFd, int32_t* pSrcNDmaFd, int32_t *pDstDmaFd)
 {
 	if(!pHandle)
 	{
@@ -431,29 +426,35 @@ int32_t NX_GlDeinterlaceRun(void *pHandle, int32_t* pSrcDmaFd, int32_t *pDstDmaF
 	}
 	NX_GL_HANDLE *pDeinterlaceHANDLE = (NX_GL_HANDLE *)pHandle;
 	int32_t bRet = false;
-
 	int32_t srcDmaFd = pSrcDmaFd[0];
-
-	HGSURFSOURCE hsource = NULL;
-	HGSURFTARGET htarget = NULL;
+	int32_t srcNDmaFd = 0;
+	int32_t idxCurr, idxNext;
+	int32_t srcWidth = pDeinterlaceHANDLE->srcWidth;
+	int32_t srcHeight = pDeinterlaceHANDLE->srcHeight;
+	HGSURFSOURCE hSource = NULL;
+	HGSURFSOURCE hSourceN = NULL;
+	HGSURFTARGET hTarget = NULL;
 
 	// find target
 	for(int i = 0; i < pDeinterlaceHANDLE->dstDmaBufNum; i++)
 	{
 		if(pDeinterlaceHANDLE->dstDmaFd[i] == pDstDmaFd[0])
 		{
-			htarget = pDeinterlaceHANDLE->ghAppGSurfTarget[i];
+			hTarget = pDeinterlaceHANDLE->ghAppGSurfTarget[i];
 			break;
 		}
 	}
 
-	int32_t index = FindSrcDmaFdIndex(pDeinterlaceHANDLE, srcDmaFd );
-	// printf("@@@@@@@ index(%d),htarget(%p)\n",index,htarget);
-	if( 0 > index )
+	if( pSrcNDmaFd )
+		srcNDmaFd = pSrcNDmaFd[0];
+
+	//
+	//	Find Current Buffer's Surface
+	//
+	idxCurr = FindSrcDmaFdIndex(pDeinterlaceHANDLE, srcDmaFd );
+	if( 0 > idxCurr )
 	{
 		//create GSurf source handle
-		int32_t srcWidth = pDeinterlaceHANDLE->srcWidth;
-		int32_t srcHeight = pDeinterlaceHANDLE->srcHeight;
 		if(pDeinterlaceHANDLE->dstImageFormat == V4L2_PIX_FMT_YUV420)
 		{
 			pDeinterlaceHANDLE->ghAppGSurfSource[pDeinterlaceHANDLE->srcDmaBufNum] = nxGSurfaceCreateDeinterlaceSource(pDeinterlaceHANDLE->ghAppGSurfCtrl, srcWidth, srcHeight, pSrcDmaFd[0]);
@@ -468,16 +469,51 @@ int32_t NX_GlDeinterlaceRun(void *pHandle, int32_t* pSrcDmaFd, int32_t *pDstDmaF
 		}
 
 		pDeinterlaceHANDLE->srcDmaFd[pDeinterlaceHANDLE->srcDmaBufNum] = srcDmaFd;
-		index = pDeinterlaceHANDLE->srcDmaBufNum;
+		idxCurr = pDeinterlaceHANDLE->srcDmaBufNum;
 		pDeinterlaceHANDLE->srcDmaBufNum++;
 	}
 
-	hsource = pDeinterlaceHANDLE->ghAppGSurfSource[index];
+	//
+	//	Find Next DMA Buffer's Surface
+	//
+	if( srcNDmaFd )
+	{
+		idxNext = FindSrcDmaFdIndex(pDeinterlaceHANDLE, srcNDmaFd );
+		if( 0 > idxNext )
+		{
+			//create GSurf source handle
+			if(pDeinterlaceHANDLE->dstImageFormat == V4L2_PIX_FMT_YUV420)
+			{
+				pDeinterlaceHANDLE->ghAppGSurfSource[pDeinterlaceHANDLE->srcDmaBufNum] = nxGSurfaceCreateDeinterlaceSource(pDeinterlaceHANDLE->ghAppGSurfCtrl, srcWidth, srcHeight, pSrcNDmaFd[0]);
+			}
+			else if(pDeinterlaceHANDLE->dstImageFormat == V4L2_PIX_FMT_YUV420M)
+			{
+				pDeinterlaceHANDLE->ghAppGSurfSource[pDeinterlaceHANDLE->srcDmaBufNum] = nxGSurfaceCreateDeinterlaceSourceWithFDs(pDeinterlaceHANDLE->ghAppGSurfCtrl, srcWidth, srcHeight, pSrcNDmaFd);
+			}
+			else
+			{
+				return -1;
+			}
 
-	uint32_t gRenderWidth = pDeinterlaceHANDLE->dstWidth;
-	uint32_t gRenderHeight = pDeinterlaceHANDLE->dstHeight;
+			pDeinterlaceHANDLE->srcDmaFd[pDeinterlaceHANDLE->srcDmaBufNum] = srcNDmaFd;
+			idxNext = pDeinterlaceHANDLE->srcDmaBufNum;
+			pDeinterlaceHANDLE->srcDmaBufNum++;
+		}
+	}
 
-	bRet = nxGSurfaceRenderDeinterlace(pDeinterlaceHANDLE->ghAppGSurfCtrl, hsource, htarget);
+	if( srcNDmaFd )
+	{
+		//	Current Surface's Odd + Next Surface's Even
+		hSource = pDeinterlaceHANDLE->ghAppGSurfSource[idxCurr];
+		hSourceN = pDeinterlaceHANDLE->ghAppGSurfSource[idxNext];
+		bRet = nxGSurfaceRenderEvenOddDeinterlace(pDeinterlaceHANDLE->ghAppGSurfCtrl, hSource, hSourceN, hTarget);
+	}
+	else
+	{
+		//	Current Surface's Even + Current Surface's Odd
+		hSource = pDeinterlaceHANDLE->ghAppGSurfSource[idxCurr];
+		bRet = nxGSurfaceRenderEvenOddDeinterlace(pDeinterlaceHANDLE->ghAppGSurfCtrl, hSource, NULL, hTarget);
+	}
 
 	if(bRet == false)
 	{
@@ -537,7 +573,7 @@ void NX_GlDeinterlaceDeInit(void *pHandle)
 //    MemCopy Functions
 //    memory to memory
 //------------------------------------------------------------------------------
-void *NX_GlMemCopyInit(uint32_t Width, uint32_t Height, int32_t (*pDstDmaFd)[3], int32_t srcImageFormat, int32_t dstOutBufNum)
+void *NX_GlMemCopyInit(uint32_t Width, uint32_t Height, int32_t (*pDstDmaFd)[3], uint32_t srcImageFormat, uint32_t dstOutBufNum)
 {
 	NX_GSURF_VMEM_IMAGE_FORMAT_MODE glSrcFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420;
 	NX_GSURF_VMEM_IMAGE_FORMAT_MODE glDstFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420;
