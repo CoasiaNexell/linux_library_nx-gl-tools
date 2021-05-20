@@ -88,11 +88,12 @@ void *NX_GlDeinterlaceInit( unsigned int srcWidth, unsigned int srcHeight,
 	return GLServiceOpen( SERVICE_ID_DEINTERLACE, &param );
 }
 
-int NX_GlDeinterlaceRun(void *pHandle, int *pSrcDmaFd, int *pDstDmaFd)
+int NX_GlDeinterlaceRun(void *pHandle, int *pSrcDmaFd, int *pSrcNDmaFd, int *pDstDmaFd)
 {
 	GL_RUN_PARAM param;
 	param.pHandle   = pHandle;
 	param.pSrcDmaFd = pSrcDmaFd;
+	param.pSrcNDmaFd = pSrcNDmaFd;
 	param.pDstDmaFd = pDstDmaFd;
 	param.option    = 0;
 	return GLServiceRun( SERVICE_ID_DEINTERLACE, &param );

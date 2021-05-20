@@ -212,8 +212,8 @@ static void *GLServiceDeinterlaceOpen(GL_OPEN_PARAM  *param)
 {
 	int32_t bRet;
 
-	NX_GSURF_VMEM_IMAGE_FORMAT_MODE glSrcFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_INTERLACE;
-	NX_GSURF_VMEM_IMAGE_FORMAT_MODE glDstFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_INTERLACE;
+	NX_GSURF_VMEM_IMAGE_FORMAT_MODE glSrcFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_EVEN_ODD_INTERLACE;
+	NX_GSURF_VMEM_IMAGE_FORMAT_MODE glDstFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_EVEN_ODD_INTERLACE;
 
 	NX_GL_HANDLE *hDeint = (NX_GL_HANDLE *)malloc(sizeof(NX_GL_HANDLE));
 
@@ -223,8 +223,6 @@ static void *GLServiceDeinterlaceOpen(GL_OPEN_PARAM  *param)
 		hDeint->srcDmaFd[i] = -1;
 		hDeint->dstDmaFd[i] = -1;
 	}
-	glSrcFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_INTERLACE;
-	glDstFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_INTERLACE;
 	hDeint->srcImageFormat = param->srcImageFormat;
 	hDeint->dstImageFormat = param->srcImageFormat;
 	hDeint->dstOutBufNum = param->dstOutBufNum;
@@ -284,6 +282,10 @@ static void *GLServiceDeinterlaceOpen(GL_OPEN_PARAM  *param)
 	{
 		return NULL;
 	}
+
+	//Ready Deinterlace
+	nxGSurfaceReadyDeinterlace(hDeint->ghAppGSurfCtrl);
+
 	return (void *)hDeint;
 }
 
@@ -291,11 +293,14 @@ static void *GLServiceDeinterlaceOpen(GL_OPEN_PARAM  *param)
 static int   GLServiceDeinterlaceRun  ( GL_RUN_PARAM  *param )
 {
 	NX_GL_HANDLE *hDeint = (NX_GL_HANDLE *)param->pHandle;
-	int bRet, srcDmaFd, index, i;
+	int bRet, srcDmaFd, i;
 	int *pDstDmaFd;
+	int idxCurr, idxNext;
+	int srcNDmaFd = 0;
 
-	HGSURFSOURCE hsource = NULL;
-	HGSURFTARGET htarget = NULL;
+	HGSURFSOURCE hSource = NULL;
+	HGSURFSOURCE hSourceN = NULL;
+	HGSURFTARGET hTarget = NULL;
 
 	if( !hDeint )
 	{
@@ -304,19 +309,24 @@ static int   GLServiceDeinterlaceRun  ( GL_RUN_PARAM  *param )
 	}
 
 	srcDmaFd = param->pSrcDmaFd[0];
+	if( param->pSrcNDmaFd )
+		srcNDmaFd = param->pSrcNDmaFd[0];
 
 	// find target
 	for(i = 0; i < hDeint->dstDmaBufNum; i++)
 	{
 		if(hDeint->dstDmaFd[i] == param->pDstDmaFd[0])
 		{
-			htarget = hDeint->ghAppGSurfTarget[i];
+			hTarget = hDeint->ghAppGSurfTarget[i];
 			break;
 		}
 	}
 
-	index = FindSrcDmaFdIndex( hDeint, srcDmaFd );
-	if( 0 > index )
+	//
+	//	Find Current Buffers' Surface
+	//
+	idxCurr = FindSrcDmaFdIndex( hDeint, srcDmaFd );
+	if( 0 > idxCurr )
 	{
 		//create GSurf source handle
 		if(hDeint->dstImageFormat == V4L2_PIX_FMT_YUV420)		//	Single Plane
@@ -335,12 +345,56 @@ static int   GLServiceDeinterlaceRun  ( GL_RUN_PARAM  *param )
 		}
 
 		hDeint->srcDmaFd[hDeint->srcDmaBufNum] = srcDmaFd;
-		index = hDeint->srcDmaBufNum;
+		idxCurr = hDeint->srcDmaBufNum;
 		hDeint->srcDmaBufNum++;
 	}
 
-	hsource = hDeint->ghAppGSurfSource[index];
-	if(false == nxGSurfaceRenderDeinterlace(hDeint->ghAppGSurfCtrl, hsource, htarget))
+
+	//
+	//	Find Next DMA Buffer's Surface
+	//
+	if( srcNDmaFd )
+	{
+		idxNext = FindSrcDmaFdIndex(hDeint, srcNDmaFd );
+		if( 0 > idxNext )
+		{
+			//create GSurf source handle
+			if(hDeint->dstImageFormat == V4L2_PIX_FMT_YUV420)
+			{
+				hDeint->ghAppGSurfSource[hDeint->srcDmaBufNum] =
+					nxGSurfaceCreateDeinterlaceSource(hDeint->ghAppGSurfCtrl, hDeint->srcWidth, hDeint->srcHeight, param->pSrcNDmaFd[0]);
+			}
+			else if(hDeint->dstImageFormat == V4L2_PIX_FMT_YUV420M)
+			{
+				hDeint->ghAppGSurfSource[hDeint->srcDmaBufNum] =
+					nxGSurfaceCreateDeinterlaceSourceWithFDs(hDeint->ghAppGSurfCtrl, hDeint->srcWidth, hDeint->srcHeight, param->pSrcNDmaFd);
+			}
+			else
+			{
+				return -1;
+			}
+
+			hDeint->srcDmaFd[hDeint->srcDmaBufNum] = srcNDmaFd;
+			idxNext = hDeint->srcDmaBufNum;
+			hDeint->srcDmaBufNum++;
+		}
+	}
+
+	if( srcNDmaFd )
+	{
+		//	Current Surface's Odd + Next Surface's Even
+		hSource = hDeint->ghAppGSurfSource[idxCurr];
+		hSourceN = hDeint->ghAppGSurfSource[idxNext];
+		bRet = nxGSurfaceRenderEvenOddDeinterlace(hDeint->ghAppGSurfCtrl, hSource, hSourceN, hTarget);
+	}
+	else
+	{
+		//	Current Surface's Even + Current Surface's Odd
+		hSource = hDeint->ghAppGSurfSource[idxCurr];
+		bRet = nxGSurfaceRenderEvenOddDeinterlace(hDeint->ghAppGSurfCtrl, hSource, NULL, hTarget);
+	}
+
+	if(bRet == false)
 	{
 		return -1;
 	}		
@@ -360,6 +414,8 @@ static void GLServiceDeinterlaceClose ( GL_CLOSE_PARAM *param )
 	}
 
 	hDeint = (NX_GL_HANDLE *)param->pHandle;
+
+	nxGSurfaceReleaseDeinterlace(hDeint->ghAppGSurfCtrl);
 
 	//destroy GSurf source handle
 	for (i = 0 ; i < hDeint->srcDmaBufNum ; i++)

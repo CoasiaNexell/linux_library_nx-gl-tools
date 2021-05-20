@@ -32,6 +32,7 @@ typedef struct tag_GL_RUN_PARAM
 {
 	void *pHandle;
 	int *pSrcDmaFd;
+	int *pSrcNDmaFd;
 	int *pDstDmaFd;
 	int option;
 } GL_RUN_PARAM;

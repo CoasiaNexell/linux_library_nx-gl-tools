@@ -15,6 +15,9 @@ libnx_gl_tools_la_LTLIBRARIES = libnx_gl_tools.la
 libnx_gl_tools_ladir = ${libdir}
 
 libnx_gl_tools_la_SOURCES = \
+	NX_Semaphore.cpp \
+	NX_Queue.cpp \
+	gl_service.cpp \
 	nx_gl_tools.cpp
 
 libnx_gl_tools_includedir = ${includedir}

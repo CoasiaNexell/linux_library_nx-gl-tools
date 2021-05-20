@@ -111,11 +111,12 @@ void *NX_GlDeinterlaceInit(unsigned int srcWidth, unsigned int srcHeight,
 * NX_GlDeinterlaceRun.
 *
 * @param[in]		*pHandle			handle
-* @param[in]		*pSrcDmaFd			source height
-* @param[in]		*pDstDmaFd			destination width
+* @param[in]		*pSrcDmaFd			current frame's DMA fd
+* @param[in]		*pSrcNDmaFd			next frame's DMA fd
+* @param[in]		*pDstDmaFd			destination frame's DMA fd
 * @return 0 on success, negative error on failure
 */
-int NX_GlDeinterlaceRun(void *pHandle, int *pSrcDmaFd, int *pDstDmaFd);
+int NX_GlDeinterlaceRun(void *pHandle, int *pSrcDmaFd, int *pSrcNDmaFd, int *pDstDmaFd);
 
 /**
 * NX_GlDeinterlaceDeInit.
