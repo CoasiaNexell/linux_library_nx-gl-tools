@@ -83,6 +83,8 @@
 //------------------------------------------------------------------------------
 typedef void* HGSURFSOURCE;
 typedef void* HGSURFTARGET;
+typedef void* HGSURFMOTIONCTRL;
+typedef void* HGSURFDATA;
 typedef void* HGSURFCTRL;
 
 //---------------------------------------------------------
@@ -120,6 +122,7 @@ typedef enum{
 	NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_INTERLACE,    /* target: mem, 				source: mem */
 	NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_EVEN_ODD_INTERLACE,    /* target: mem, 				source: mem */
 	NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_ODD_EVEN_INTERLACE,    /* target: mem, 				source: mem */
+	NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_MOTION_INTERLACE,      /* target: mem, 				source: mem */
 	NX_GSURF_VMEM_IMAGE_FORMAT_YUV422, 	 			/* target: display, mem, 		source not supported */
 	NX_GSURF_VMEM_IMAGE_FORMAT_NV12,   	 			/* target: mem, 				source not supported */
 	NX_GSURF_VMEM_IMAGE_FORMAT_NV21,   	 			/* target: mem, 				source not supported */
@@ -299,6 +302,14 @@ NX_APICALL void nxGSurfaceDestroyTarget(HGSURFCTRL hgsurf_ctrl, HGSURFTARGET hta
 //
 NX_APICALL void nxGSurfaceDestroyTargetEglImages(HGSURFCTRL hgsurf_ctrl, HGSURFTARGET htarget);
 //
+// meta data for memory with single dma_fd.
+//
+NX_APICALL HGSURFMOTIONCTRL nxGSurfaceCreateMotionData(HGSURFCTRL hgsurf_ctrl, unsigned int src_width, unsigned int src_height, int src_dma_fd0, int src_dma_fd1);
+//
+// meta data for memory with single dma_fd.
+//
+NX_APICALL void nxGSurfaceDestroyMotionData(HGSURFCTRL hgsurf_ctrl, HGSURFMOTIONCTRL hdata);
+//
 // texture is memory
 // all target format : 30fps
 // 
@@ -335,13 +346,23 @@ NX_APICALL NX_BOOL nxGSurfaceRenderDeinterlace(HGSURFCTRL hgsurf_ctrl, HGSURFSOU
 //
 NX_APICALL NX_BOOL nxGSurfaceRenderEvenOddDeinterlace(HGSURFCTRL hgsurf_ctrl, HGSURFSOURCE hsource_curr, HGSURFSOURCE hsource_next, HGSURFTARGET htarget); 
 //
+//
+//
+NX_APICALL NX_BOOL nxGSurfaceRenderMotionData(HGSURFCTRL hgsurf_ctrl, HGSURFSOURCE hsource_curr, HGSURFSOURCE hsource_next, HGSURFMOTIONCTRL hmotion_ctrl); 
+//
+// 1440x1080 : 23ms
+// If hsource_next is NULL then the Deinterlace use EOE sequence. Or OEO sequence.
+//
+NX_APICALL NX_BOOL nxGSurfaceRenderMotionDeinterlace(HGSURFCTRL hgsurf_ctrl, HGSURFSOURCE hsource_curr, HGSURFSOURCE hsource_next, 
+			HGSURFMOTIONCTRL hmotion_ctrl, HGSURFTARGET htarget, float y_motion_strength, float uv_motion_strength); 
+//
 // create reference texture.
 //
-NX_APICALL NX_BOOL nxGSurfaceReadyDeinterlace(HGSURFCTRL hgsurf_ctrl);
+NX_APICALL NX_BOOL nxGSurfaceReadyDeinterlace(HGSURFCTRL hgsurf_ctrl, HGSURFMOTIONCTRL hmotion_ctrl);
 //
 // destroy reference texture.
 //
-NX_APICALL void nxGSurfaceReleaseDeinterlace(HGSURFCTRL hgsurf_ctrl);
+NX_APICALL void nxGSurfaceReleaseDeinterlace(HGSURFCTRL hgsurf_ctrl, HGSURFMOTIONCTRL hmotion_ctrl);
 //
 // only for displaying.
 //
