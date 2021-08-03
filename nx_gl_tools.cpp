@@ -75,7 +75,8 @@ void NX_GlRotateDeInit(void *pHandle)
 //
 void *NX_GlDeinterlaceInit( unsigned int srcWidth, unsigned int srcHeight,
 							unsigned int dstWidth, unsigned int dstHeight,
-							int (*pDstDmaFd)[3], int srcImageFormat, int dstOutBufNum, int motionFds[2], float coeff)
+							int (*pDstDmaFd)[3], int srcImageFormat, int dstOutBufNum,
+							int mode, int motionFds[2], float coeff)
 {
 	GL_OPEN_PARAM param;
 	param.srcWidth       = srcWidth;
@@ -85,6 +86,7 @@ void *NX_GlDeinterlaceInit( unsigned int srcWidth, unsigned int srcHeight,
 	param.pDstDmaFd      = pDstDmaFd;
 	param.srcImageFormat = srcImageFormat;
 	param.dstOutBufNum   = dstOutBufNum;
+	param.mode           = mode;
 	param.motionFds[0]   = motionFds[0];
 	param.motionFds[1]   = motionFds[1];
 	param.coeff          = coeff;

@@ -27,6 +27,7 @@ typedef struct tag_GL_OPEN_PARAM
 	int (*pDstDmaFd)[3];
 	int srcImageFormat;
 	int dstOutBufNum;
+	int mode;
 	int motionFds[2];
 	float coeff;
 } GL_OPEN_PARAM;

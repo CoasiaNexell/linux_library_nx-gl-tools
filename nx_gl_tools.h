@@ -48,6 +48,9 @@ enum
 	NX_ROTATE_MAX
 };
 
+#define DEINT_MODE_MIXING	0
+#define	DEINT_MODE_ADAPTIVE	1
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -101,6 +104,7 @@ void NX_GlRotateDeInit(void *pHandle);
 * @param[in]		(*pDstDmaFd)[3]		destination dmaFd
 * @param[in]		srcImageFormat		source imageFormat
 * @param[in]		dstOutBufNum		destination buffer number
+* @param[in]		mode				deinterlace mode (def:0)
 * @param[in]		motionFds			motion buffer's fds
 * @param[in]		coeff				co-efficient ( 1.5 ~ 3.0, def 2.5 )
 * @return if not null on success(handle), null on failure
@@ -108,7 +112,7 @@ void NX_GlRotateDeInit(void *pHandle);
 void *NX_GlDeinterlaceInit(unsigned int srcWidth, unsigned int srcHeight,
 						   unsigned int dstWidth, unsigned int dstHeight,
 						   int (*pDstDmaFd)[3], int srcImageFormat, int dstOutBufNum,
-						   int motionFds[2], float coeff);
+						   int mode, int motionFds[2], float coeff);
 
 /**
 * NX_GlDeinterlaceMotion.

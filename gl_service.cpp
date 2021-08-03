@@ -11,6 +11,7 @@
 
 //	opengl library
 #include <nx_gpu_surf.h>
+#include <nx_gl_tools.h>
 
 //////////////////////////////////////////////////////////////////////////////
 //																			//
@@ -99,6 +100,7 @@ typedef struct
 	unsigned int 		dstWidth;
 	unsigned int 		dstHeight;
 	int					dstOutBufNum;
+	int					mode;
 	int					motionFds[2];
 	float				coeff;
 } NX_GL_HANDLE;
@@ -265,14 +267,15 @@ static void *GLServiceDeinterlaceOpen(GL_OPEN_PARAM  *param)
 	}
 	hDeint->srcImageFormat = param->srcImageFormat;
 	hDeint->dstImageFormat = param->srcImageFormat;
-	hDeint->dstOutBufNum = param->dstOutBufNum;
-	hDeint->srcWidth  = param->srcWidth;
-	hDeint->srcHeight = param->srcHeight;
-	hDeint->dstWidth  = param->dstWidth;
-	hDeint->dstHeight = param->dstHeight;
-	hDeint->motionFds[0] = param->motionFds[0];
-	hDeint->motionFds[1] = param->motionFds[1];
-	hDeint->coeff = param->coeff;
+	hDeint->dstOutBufNum   = param->dstOutBufNum;
+	hDeint->srcWidth       = param->srcWidth;
+	hDeint->srcHeight      = param->srcHeight;
+	hDeint->dstWidth       = param->dstWidth;
+	hDeint->dstHeight      = param->dstHeight;
+	hDeint->mode           = param->mode;
+	hDeint->motionFds[0]   = param->motionFds[0];
+	hDeint->motionFds[1]   = param->motionFds[1];
+	hDeint->coeff          = param->coeff;
 
 	if( (param->srcImageFormat != V4L2_PIX_FMT_YUV420) && (param->srcImageFormat != V4L2_PIX_FMT_YUV420M) )
 	{
@@ -285,6 +288,17 @@ static void *GLServiceDeinterlaceOpen(GL_OPEN_PARAM  *param)
 						0, 0, 0, 0, 0, NX_FALSE);
 
 	nxGSurfaceSetDoneCallback(hDeint->ghAppGSurfCtrl, NULL); /* not used  at pixmap */
+
+	if( hDeint->mode == DEINT_MODE_ADAPTIVE )
+	{
+		glSrcFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_MOTION_INTERLACE;
+		glDstFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_MOTION_INTERLACE;
+	}
+	else
+	{
+		glSrcFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_INTERLACE;
+		glDstFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_INTERLACE;
+	}
 
 	//	init GSurf EGL
 	bRet = nxGSurfaceInitEGL(hDeint->ghAppGSurfCtrl, NULL,
@@ -326,11 +340,14 @@ static void *GLServiceDeinterlaceOpen(GL_OPEN_PARAM  *param)
 		return NULL;
 	}
 
-	hDeint->ghAppGSurfMotion = 
-		nxGSurfaceCreateMotionData(hDeint->ghAppGSurfCtrl, hDeint->srcWidth, hDeint->srcHeight, hDeint->motionFds[0], hDeint->motionFds[1]);
+	if( hDeint->mode == DEINT_MODE_ADAPTIVE )
+	{
+		hDeint->ghAppGSurfMotion = 
+			nxGSurfaceCreateMotionData(hDeint->ghAppGSurfCtrl, hDeint->srcWidth, hDeint->srcHeight, hDeint->motionFds[0], hDeint->motionFds[1]);
 
-	//Ready Deinterlace
-	nxGSurfaceReadyDeinterlace(hDeint->ghAppGSurfCtrl, hDeint->ghAppGSurfMotion);
+		//	Ready Deinterlace
+		nxGSurfaceReadyDeinterlace(hDeint->ghAppGSurfCtrl, hDeint->ghAppGSurfMotion);
+	}
 
 	return (void *)hDeint;
 }
@@ -390,11 +407,17 @@ static int   GLServiceDeinterlaceRun  ( GL_RUN_PARAM  *param )
 		hSourceN = hDeint->ghAppGSurfSource[idxNext];
 	}
 
-
-	bRet = nxGSurfaceRenderMotionDeinterlace(
-		hDeint->ghAppGSurfCtrl,
-		hSource, hSourceN, hDeint->ghAppGSurfMotion, hTarget,
-		hDeint->coeff, hDeint->coeff);
+	if( hDeint->mode == DEINT_MODE_ADAPTIVE )
+	{
+		bRet = nxGSurfaceRenderMotionDeinterlace(
+			hDeint->ghAppGSurfCtrl,
+			hSource, hSourceN, hDeint->ghAppGSurfMotion, hTarget,
+			hDeint->coeff, hDeint->coeff);
+	}
+	else
+	{
+		bRet = nxGSurfaceRenderDeinterlace(hDeint->ghAppGSurfCtrl, hSource, hTarget); 
+	}
 	if(bRet == false)
 	{
 		return -1;
@@ -416,7 +439,10 @@ static void GLServiceDeinterlaceClose ( GL_CLOSE_PARAM *param )
 
 	hDeint = (NX_GL_HANDLE *)param->pHandle;
 
-	nxGSurfaceReleaseDeinterlace(hDeint->ghAppGSurfCtrl, hDeint->ghAppGSurfMotion);
+	if( hDeint->mode == DEINT_MODE_ADAPTIVE )
+	{
+		nxGSurfaceReleaseDeinterlace(hDeint->ghAppGSurfCtrl, hDeint->ghAppGSurfMotion);
+	}
 
 	//destroy GSurf source handle
 	for (i = 0 ; i < hDeint->srcDmaBufNum ; i++)
@@ -437,7 +463,10 @@ static void GLServiceDeinterlaceClose ( GL_CLOSE_PARAM *param )
 		hDeint->ghAppGSurfTarget[i] = NULL;
 	}
 
-	nxGSurfaceDestroyMotionData(hDeint->ghAppGSurfCtrl, hDeint->ghAppGSurfMotion);
+	if( hDeint->mode == DEINT_MODE_ADAPTIVE )
+	{
+		nxGSurfaceDestroyMotionData(hDeint->ghAppGSurfCtrl, hDeint->ghAppGSurfMotion);
+	}
 
 	//deinit GSurf EGL
 	nxGSurfaceDeinitEGL(hDeint->ghAppGSurfCtrl);
