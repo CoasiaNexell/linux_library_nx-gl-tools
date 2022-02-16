@@ -11,6 +11,7 @@
 
 //	opengl library
 #include <nx_gpu_surf.h>
+#include <nx_gl_tools.h>
 
 //////////////////////////////////////////////////////////////////////////////
 //																			//
@@ -20,6 +21,9 @@
 //																			//
 //////////////////////////////////////////////////////////////////////////////
 //	Debugging Macrhos
+
+#define	DEBUG_API		(0)
+
 #ifdef ANDROID
 #define LOG_TAG "NX_GL_TOOLS"	//	log options
 #include <utils/Log.h>
@@ -71,29 +75,34 @@ typedef struct tag_GL_SERVICE_CMD {
 } GL_SERVICE_CMD;
 
 typedef struct tag_NX_GT_SERVICE {
-	void*	(*GLOpen)	( GL_OPEN_PARAM  *param );
-	int		(*GLRun)	( GL_RUN_PARAM   *param );
-	void	(*GLClose)	( GL_CLOSE_PARAM *param );
+	void*	(*GLOpen)	( GL_OPEN_PARAM   *param );
+	int		(*GLRun)	( GL_RUN_PARAM    *param );
+	void	(*GLClose)	( GL_CLOSE_PARAM  *param );
+	int		(*GLMotion)	( GL_MOTION_PARAM *param );
 } NX_GT_SERVICE;
 
 
 //	Instance Handle
 typedef struct
 {
-	HGSURFCTRL 		ghAppGSurfCtrl;
-	HGSURFSOURCE 	ghAppGSurfSource[MAX_BUFFER_NUM];
-	HGSURFTARGET 	ghAppGSurfTarget[MAX_BUFFER_NUM];
-	int				srcImageFormat;
-	int				dstImageFormat;
-	int 			srcDmaFd[MAX_BUFFER_NUM];
-	int 			srcDmaBufNum;
-	int 			dstDmaFd[MAX_BUFFER_NUM];
-	int 			dstDmaBufNum;
-	unsigned int	srcWidth;
-	unsigned int 	srcHeight;
-	unsigned int 	dstWidth;
-	unsigned int 	dstHeight;
-	int				dstOutBufNum;
+	HGSURFCTRL 			ghAppGSurfCtrl;
+	HGSURFSOURCE 		ghAppGSurfSource[MAX_BUFFER_NUM];
+	HGSURFTARGET 		ghAppGSurfTarget[MAX_BUFFER_NUM];
+	HGSURFMOTIONCTRL	ghAppGSurfMotion;
+	int					srcImageFormat;
+	int					dstImageFormat;
+	int 				srcDmaFd[MAX_BUFFER_NUM];
+	int 				srcDmaBufNum;
+	int 				dstDmaFd[MAX_BUFFER_NUM];
+	int 				dstDmaBufNum;
+	unsigned int		srcWidth;
+	unsigned int 		srcHeight;
+	unsigned int 		dstWidth;
+	unsigned int 		dstHeight;
+	int					dstOutBufNum;
+	int					mode;
+	int					motionFds[2];
+	float				coeff;
 } NX_GL_HANDLE;
 
 
@@ -118,19 +127,52 @@ static NX_GT_SERVICE gst_ServiceList[MAX_SERVICE_NUM];
 //																			//
 //																			//
 //////////////////////////////////////////////////////////////////////////////
-static int FindSrcDmaFdIndex(NX_GL_HANDLE *pGlHANDLE, int srcDmaFd)
+static int FindSrcDmaFdIndex(NX_GL_HANDLE *hGl, int srcDmaFd)
 {
 	int i=0;
 
-	for( i = 0 ; i < pGlHANDLE->srcDmaBufNum ; i ++ )
+	for( i = 0 ; i < hGl->srcDmaBufNum ; i ++ )
 	{
-		if( pGlHANDLE->srcDmaFd[i] == srcDmaFd )
+		if( hGl->srcDmaFd[i] == srcDmaFd )
 		{
 			//	already added memory
 			return i;
 		}
 	}
 	return -1;
+}
+
+static int FindSrcDmaFdIndexWithCreate(NX_GL_HANDLE *hGl, int *pDmaFds )
+{
+	int i=0;
+	for( i = 0 ; i < hGl->srcDmaBufNum ; i ++ )
+	{
+		if( hGl->srcDmaFd[i] == pDmaFds[0] )
+		{
+			return i;
+		}
+	}
+
+	//create GSurf source handle
+	if(hGl->dstImageFormat == V4L2_PIX_FMT_YUV420)		//	Single Plane
+	{
+		hGl->ghAppGSurfSource[hGl->srcDmaBufNum] = 
+			nxGSurfaceCreateDeinterlaceSource(hGl->ghAppGSurfCtrl, hGl->srcWidth, hGl->srcHeight, pDmaFds[0]);
+	}
+	else if(hGl->dstImageFormat == V4L2_PIX_FMT_YUV420M)	//	Multiple Plane
+	{
+		hGl->ghAppGSurfSource[hGl->srcDmaBufNum] = 
+			nxGSurfaceCreateDeinterlaceSourceWithFDs(hGl->ghAppGSurfCtrl, hGl->srcWidth, hGl->srcHeight, pDmaFds);
+	}
+	else
+	{
+		return -1;
+	}
+
+	hGl->srcDmaFd[hGl->srcDmaBufNum] = pDmaFds[0];
+	i = hGl->srcDmaBufNum;
+	hGl->srcDmaBufNum++;
+	return i;
 }
 
 static unsigned int vmem_get_size(unsigned int width, unsigned int height,
@@ -212,8 +254,8 @@ static void *GLServiceDeinterlaceOpen(GL_OPEN_PARAM  *param)
 {
 	int32_t bRet;
 
-	NX_GSURF_VMEM_IMAGE_FORMAT_MODE glSrcFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_INTERLACE;
-	NX_GSURF_VMEM_IMAGE_FORMAT_MODE glDstFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_INTERLACE;
+	NX_GSURF_VMEM_IMAGE_FORMAT_MODE glSrcFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_MOTION_INTERLACE;
+	NX_GSURF_VMEM_IMAGE_FORMAT_MODE glDstFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_MOTION_INTERLACE;
 
 	NX_GL_HANDLE *hDeint = (NX_GL_HANDLE *)malloc(sizeof(NX_GL_HANDLE));
 
@@ -223,15 +265,17 @@ static void *GLServiceDeinterlaceOpen(GL_OPEN_PARAM  *param)
 		hDeint->srcDmaFd[i] = -1;
 		hDeint->dstDmaFd[i] = -1;
 	}
-	glSrcFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_INTERLACE;
-	glDstFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_INTERLACE;
 	hDeint->srcImageFormat = param->srcImageFormat;
 	hDeint->dstImageFormat = param->srcImageFormat;
-	hDeint->dstOutBufNum = param->dstOutBufNum;
-	hDeint->srcWidth  = param->srcWidth;
-	hDeint->srcHeight = param->srcHeight;
-	hDeint->dstWidth  = param->dstWidth;
-	hDeint->dstHeight = param->dstHeight;
+	hDeint->dstOutBufNum   = param->dstOutBufNum;
+	hDeint->srcWidth       = param->srcWidth;
+	hDeint->srcHeight      = param->srcHeight;
+	hDeint->dstWidth       = param->dstWidth;
+	hDeint->dstHeight      = param->dstHeight;
+	hDeint->mode           = param->mode;
+	hDeint->motionFds[0]   = param->motionFds[0];
+	hDeint->motionFds[1]   = param->motionFds[1];
+	hDeint->coeff          = param->coeff;
 
 	if( (param->srcImageFormat != V4L2_PIX_FMT_YUV420) && (param->srcImageFormat != V4L2_PIX_FMT_YUV420M) )
 	{
@@ -244,6 +288,17 @@ static void *GLServiceDeinterlaceOpen(GL_OPEN_PARAM  *param)
 						0, 0, 0, 0, 0, NX_FALSE);
 
 	nxGSurfaceSetDoneCallback(hDeint->ghAppGSurfCtrl, NULL); /* not used  at pixmap */
+
+	if( hDeint->mode == DEINT_MODE_ADAPTIVE )
+	{
+		glSrcFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_MOTION_INTERLACE;
+		glDstFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_MOTION_INTERLACE;
+	}
+	else
+	{
+		glSrcFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_INTERLACE;
+		glDstFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_INTERLACE;
+	}
 
 	//	init GSurf EGL
 	bRet = nxGSurfaceInitEGL(hDeint->ghAppGSurfCtrl, NULL,
@@ -284,18 +339,45 @@ static void *GLServiceDeinterlaceOpen(GL_OPEN_PARAM  *param)
 	{
 		return NULL;
 	}
+
+	if( hDeint->mode == DEINT_MODE_ADAPTIVE )
+	{
+		hDeint->ghAppGSurfMotion = 
+			nxGSurfaceCreateMotionData(hDeint->ghAppGSurfCtrl, hDeint->srcWidth, hDeint->srcHeight, hDeint->motionFds[0], hDeint->motionFds[1]);
+
+		//	Ready Deinterlace
+		nxGSurfaceReadyDeinterlace(hDeint->ghAppGSurfCtrl, hDeint->ghAppGSurfMotion);
+	}
+
 	return (void *)hDeint;
 }
 
+static int GLServiceDeinterlaceMakeMotion ( GL_MOTION_PARAM *param )
+{
+	NX_GL_HANDLE *hDeint = (NX_GL_HANDLE *)param->pHandle;
+
+	if( (NULL == param) || (NULL == param->pHandle) )
+	{
+		NX_ERR("Handle is NULL !\n");
+		return -1; 
+	}
+	int idxCurr = FindSrcDmaFdIndexWithCreate( hDeint, param->pSrcDmaFds );
+	int idxNext = FindSrcDmaFdIndexWithCreate( hDeint, param->pSrcNDmaFds );
+	HGSURFSOURCE hSource = hDeint->ghAppGSurfSource[idxCurr];
+	HGSURFSOURCE hSourceN = hDeint->ghAppGSurfSource[idxNext];
+	bool ret = nxGSurfaceRenderMotionData(hDeint->ghAppGSurfCtrl, hSource, hSourceN, hDeint->ghAppGSurfMotion );
+	return ret ? 0 : -1;
+}
 
 static int   GLServiceDeinterlaceRun  ( GL_RUN_PARAM  *param )
 {
 	NX_GL_HANDLE *hDeint = (NX_GL_HANDLE *)param->pHandle;
-	int bRet, srcDmaFd, index, i;
-	int *pDstDmaFd;
+	int bRet, i;
+	int idxCurr, idxNext;
 
-	HGSURFSOURCE hsource = NULL;
-	HGSURFTARGET htarget = NULL;
+	HGSURFSOURCE hSource = NULL;
+	HGSURFSOURCE hSourceN = NULL;
+	HGSURFTARGET hTarget = NULL;
 
 	if( !hDeint )
 	{
@@ -303,44 +385,40 @@ static int   GLServiceDeinterlaceRun  ( GL_RUN_PARAM  *param )
 		return -1; 
 	}
 
-	srcDmaFd = param->pSrcDmaFd[0];
-
 	// find target
 	for(i = 0; i < hDeint->dstDmaBufNum; i++)
 	{
 		if(hDeint->dstDmaFd[i] == param->pDstDmaFd[0])
 		{
-			htarget = hDeint->ghAppGSurfTarget[i];
+			hTarget = hDeint->ghAppGSurfTarget[i];
 			break;
 		}
 	}
 
-	index = FindSrcDmaFdIndex( hDeint, srcDmaFd );
-	if( 0 > index )
-	{
-		//create GSurf source handle
-		if(hDeint->dstImageFormat == V4L2_PIX_FMT_YUV420)		//	Single Plane
-		{
-			hDeint->ghAppGSurfSource[hDeint->srcDmaBufNum] = 
-				nxGSurfaceCreateDeinterlaceSource(hDeint->ghAppGSurfCtrl, hDeint->srcWidth, hDeint->srcHeight, param->pSrcDmaFd[0]);
-		}
-		else if(hDeint->dstImageFormat == V4L2_PIX_FMT_YUV420M)	//	Multiple Plane
-		{
-			hDeint->ghAppGSurfSource[hDeint->srcDmaBufNum] = 
-				nxGSurfaceCreateDeinterlaceSourceWithFDs(hDeint->ghAppGSurfCtrl, hDeint->srcWidth, hDeint->srcHeight, param->pSrcDmaFd);
-		}
-		else
-		{
-			return -1;
-		}
+	//	Find Current Buffers' Surface
+	idxCurr = FindSrcDmaFdIndexWithCreate( hDeint, param->pSrcDmaFd );
+	hSource = hDeint->ghAppGSurfSource[idxCurr];
 
-		hDeint->srcDmaFd[hDeint->srcDmaBufNum] = srcDmaFd;
-		index = hDeint->srcDmaBufNum;
-		hDeint->srcDmaBufNum++;
+	//	Find Next DMA Buffer's index
+	if( param->pSrcNDmaFd )
+	{
+		//	Odd Even Odd
+		idxNext = FindSrcDmaFdIndexWithCreate( hDeint, param->pSrcNDmaFd );
+		hSourceN = hDeint->ghAppGSurfSource[idxNext];
 	}
 
-	hsource = hDeint->ghAppGSurfSource[index];
-	if(false == nxGSurfaceRenderDeinterlace(hDeint->ghAppGSurfCtrl, hsource, htarget))
+	if( hDeint->mode == DEINT_MODE_ADAPTIVE )
+	{
+		bRet = nxGSurfaceRenderMotionDeinterlace(
+			hDeint->ghAppGSurfCtrl,
+			hSource, hSourceN, hDeint->ghAppGSurfMotion, hTarget,
+			hDeint->coeff, hDeint->coeff);
+	}
+	else
+	{
+		bRet = nxGSurfaceRenderDeinterlace(hDeint->ghAppGSurfCtrl, hSource, hTarget); 
+	}
+	if(bRet == false)
 	{
 		return -1;
 	}		
@@ -361,6 +439,11 @@ static void GLServiceDeinterlaceClose ( GL_CLOSE_PARAM *param )
 
 	hDeint = (NX_GL_HANDLE *)param->pHandle;
 
+	if( hDeint->mode == DEINT_MODE_ADAPTIVE )
+	{
+		nxGSurfaceReleaseDeinterlace(hDeint->ghAppGSurfCtrl, hDeint->ghAppGSurfMotion);
+	}
+
 	//destroy GSurf source handle
 	for (i = 0 ; i < hDeint->srcDmaBufNum ; i++)
 	{
@@ -378,6 +461,11 @@ static void GLServiceDeinterlaceClose ( GL_CLOSE_PARAM *param )
 		//destroy GSurf target handle
 		nxGSurfaceDestroyTarget(hDeint->ghAppGSurfCtrl, hDeint->ghAppGSurfTarget[i]);
 		hDeint->ghAppGSurfTarget[i] = NULL;
+	}
+
+	if( hDeint->mode == DEINT_MODE_ADAPTIVE )
+	{
+		nxGSurfaceDestroyMotionData(hDeint->ghAppGSurfCtrl, hDeint->ghAppGSurfMotion);
 	}
 
 	//deinit GSurf EGL
@@ -763,15 +851,16 @@ static void  GLServiceCopyBufferClose( GL_CLOSE_PARAM *param )
 //////////////////////////////////////////////////////////////////////////////
 static void RegisterServices()
 {
-	gst_ServiceList[SERVICE_ID_DEINTERLACE].GLOpen  = GLServiceDeinterlaceOpen;
-	gst_ServiceList[SERVICE_ID_DEINTERLACE].GLRun   = GLServiceDeinterlaceRun;
-	gst_ServiceList[SERVICE_ID_DEINTERLACE].GLClose = GLServiceDeinterlaceClose;
-	gst_ServiceList[SERVICE_ID_COPY       ].GLOpen  = GLServiceRotateOpen;
-	gst_ServiceList[SERVICE_ID_COPY       ].GLRun   = GLServiceRotateRun;
-	gst_ServiceList[SERVICE_ID_COPY       ].GLClose = GLServiceRotateClose;
-	gst_ServiceList[SERVICE_ID_ROTATE     ].GLOpen  = GLServiceCopyBufferOpen;
-	gst_ServiceList[SERVICE_ID_ROTATE     ].GLRun   = GLServiceCopyBufferRun;
-	gst_ServiceList[SERVICE_ID_ROTATE     ].GLClose = GLServiceCopyBufferClose;
+	gst_ServiceList[SERVICE_ID_DEINTERLACE].GLOpen   = GLServiceDeinterlaceOpen;
+	gst_ServiceList[SERVICE_ID_DEINTERLACE].GLRun    = GLServiceDeinterlaceRun;
+	gst_ServiceList[SERVICE_ID_DEINTERLACE].GLClose  = GLServiceDeinterlaceClose;
+	gst_ServiceList[SERVICE_ID_DEINTERLACE].GLMotion = GLServiceDeinterlaceMakeMotion;
+	gst_ServiceList[SERVICE_ID_COPY       ].GLOpen   = GLServiceRotateOpen;
+	gst_ServiceList[SERVICE_ID_COPY       ].GLRun    = GLServiceRotateRun;
+	gst_ServiceList[SERVICE_ID_COPY       ].GLClose  = GLServiceRotateClose;
+	gst_ServiceList[SERVICE_ID_ROTATE     ].GLOpen   = GLServiceCopyBufferOpen;
+	gst_ServiceList[SERVICE_ID_ROTATE     ].GLRun    = GLServiceCopyBufferRun;
+	gst_ServiceList[SERVICE_ID_ROTATE     ].GLClose  = GLServiceCopyBufferClose;
 }
 
 
@@ -781,7 +870,9 @@ void *GLServiceThread( void *arg )
 	GL_SERVICE_CMD *pCmd;
 	(void) arg;
 
+#if DEBUG_API
 	NX_DBG("GLServiceThread Started!!\n");
+#endif
 
 	//	Register GL Services
 	RegisterServices();
@@ -816,12 +907,18 @@ void *GLServiceThread( void *arg )
 			gst_ServiceList[pCmd->id].GLClose( (GL_CLOSE_PARAM*)pCmd->data );
 			pCmd->retCode = 0;
 			break;
+		case SERVICE_CMD_MOTION :
+			retCode = gst_ServiceList[pCmd->id].GLMotion( (GL_MOTION_PARAM*)pCmd->data );
+			pCmd->retCode = retCode;
+			break;
 		default :
 			break;
 		}
 		NX_SemaporePost( gst_SvcInfo.hSemResult );
 	}
+#if DEBUG_API
 	NX_DBG("GLServiceThread End!!\n");
+#endif
 	return (void*)0xDEADDEAD;
 }
 
@@ -829,7 +926,9 @@ void *GLServiceThread( void *arg )
 
 static void GTServiceInit()
 {
-	//	NX_DBG("[%s : %d] In\n", __FUNCTION__, __LINE__);
+#if DEBUG_API
+	NX_DBG("[%s : %d] In\n", __FUNCTION__, __LINE__);
+#endif
 	pthread_mutex_lock( &gst_SvcCtrlLock );
 	if( 0 == gst_NumInstance )
 	{
@@ -853,13 +952,17 @@ static void GTServiceInit()
 		}
 	}
 	pthread_mutex_unlock( &gst_SvcCtrlLock );
-	//	NX_DBG("[%s : %d] Out\n", __FUNCTION__, __LINE__);
+#if DEBUG_API
+	NX_DBG("[%s : %d] Out\n", __FUNCTION__, __LINE__);
+#endif
 }
 
 
 static void GTServiceDeinit()
 {
-	//	NX_DBG("[%s : %d] In\n", __FUNCTION__, __LINE__);
+#if DEBUG_API
+	NX_DBG("[%s : %d] In\n", __FUNCTION__, __LINE__);
+#endif
 	pthread_mutex_lock( &gst_SvcCtrlLock );
 	if( 1 == gst_NumInstance )
 	{
@@ -876,14 +979,18 @@ static void GTServiceDeinit()
 		gst_NumInstance = 0;
 	}
 	pthread_mutex_unlock( &gst_SvcCtrlLock );
-	//	NX_DBG("[%s : %d] Out\n", __FUNCTION__, __LINE__);
+#if DEBUG_API
+	NX_DBG("[%s : %d] Out\n", __FUNCTION__, __LINE__);
+#endif
 }
 
 //	gst_NumInstance
 void *GLServiceOpen( int id, GL_OPEN_PARAM *param )
 {
 	GL_SERVICE_CMD cmd;
-	//	NX_DBG("[%s : %d] In\n", __FUNCTION__, __LINE__);
+#if DEBUG_API
+	NX_DBG("[%s : %d] In\n", __FUNCTION__, __LINE__);
+#endif
 	GTServiceInit();
 
 	cmd.id      = id;
@@ -897,14 +1004,18 @@ void *GLServiceOpen( int id, GL_OPEN_PARAM *param )
 	//	Wait Result
 	NX_SemaporePend( gst_SvcInfo.hSemResult );
 	cmd.retCode = 0;
-	//	NX_DBG("[%s : %d] Out\n", __FUNCTION__, __LINE__);
+#if DEBUG_API
+	NX_DBG("[%s : %d] Out\n", __FUNCTION__, __LINE__);
+#endif
 	return cmd.handle;
 }
 
 int GLServiceRun( int id, GL_RUN_PARAM *param )
 {
 	GL_SERVICE_CMD cmd;
-	//	NX_DBG("[%s : %d] In\n", __FUNCTION__, __LINE__);
+#if DEBUG_API
+	NX_DBG("[%s : %d] In\n", __FUNCTION__, __LINE__);
+#endif
 	cmd.id      = id;
 	cmd.cmd     = SERVICE_CMD_RUN;
 	cmd.data    = param;
@@ -915,14 +1026,18 @@ int GLServiceRun( int id, GL_RUN_PARAM *param )
 
 	//	Wait Result
 	NX_SemaporePend( gst_SvcInfo.hSemResult );
-	//	NX_DBG("[%s : %d] Out\n", __FUNCTION__, __LINE__);
+#if DEBUG_API
+	NX_DBG("[%s : %d] Out\n", __FUNCTION__, __LINE__);
+#endif
 	return cmd.retCode;
 }
 
 void GLServiceClose( int id, GL_CLOSE_PARAM *param )
 {
 	GL_SERVICE_CMD cmd;
-	//	NX_DBG("[%s : %d] In\n", __FUNCTION__, __LINE__);
+#if DEBUG_API
+	NX_DBG("[%s : %d] In\n", __FUNCTION__, __LINE__);
+#endif
 	cmd.id      = id;
 	cmd.cmd     = SERVICE_CMD_CLOSE;
 	cmd.data    = param;
@@ -934,6 +1049,30 @@ void GLServiceClose( int id, GL_CLOSE_PARAM *param )
 	//	Wait Result
 	NX_SemaporePend( gst_SvcInfo.hSemResult );
 	GTServiceDeinit();
-	//	NX_DBG("[%s : %d] Out\n", __FUNCTION__, __LINE__);
+#if DEBUG_API
+	NX_DBG("[%s : %d] Out\n", __FUNCTION__, __LINE__);
+#endif
 	return;
+}
+
+int GLServiceMotion( int id, GL_MOTION_PARAM *param )
+{
+	GL_SERVICE_CMD cmd;
+#if DEBUG_API
+	NX_DBG("[%s : %d] In\n", __FUNCTION__, __LINE__);
+#endif
+	cmd.id      = id;
+	cmd.cmd     = SERVICE_CMD_MOTION;
+	cmd.data    = param;
+
+	//	Push queue
+	NX_QueuePush( gst_SvcInfo.hCmdQueue, &cmd );
+	NX_SemaporePost( gst_SvcInfo.hSemCmd );
+
+	//	Wait Result
+	NX_SemaporePend( gst_SvcInfo.hSemResult );
+#if DEBUG_API
+	NX_DBG("[%s : %d] Out\n", __FUNCTION__, __LINE__);
+#endif
+	return cmd.retCode;
 }

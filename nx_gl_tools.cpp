@@ -75,7 +75,8 @@ void NX_GlRotateDeInit(void *pHandle)
 //
 void *NX_GlDeinterlaceInit( unsigned int srcWidth, unsigned int srcHeight,
 							unsigned int dstWidth, unsigned int dstHeight,
-							int (*pDstDmaFd)[3], int srcImageFormat, int dstOutBufNum)
+							int (*pDstDmaFd)[3], int srcImageFormat, int dstOutBufNum,
+							int mode, int motionFds[2], float coeff)
 {
 	GL_OPEN_PARAM param;
 	param.srcWidth       = srcWidth;
@@ -85,14 +86,19 @@ void *NX_GlDeinterlaceInit( unsigned int srcWidth, unsigned int srcHeight,
 	param.pDstDmaFd      = pDstDmaFd;
 	param.srcImageFormat = srcImageFormat;
 	param.dstOutBufNum   = dstOutBufNum;
+	param.mode           = mode;
+	param.motionFds[0]   = motionFds[0];
+	param.motionFds[1]   = motionFds[1];
+	param.coeff          = coeff;
 	return GLServiceOpen( SERVICE_ID_DEINTERLACE, &param );
 }
 
-int NX_GlDeinterlaceRun(void *pHandle, int *pSrcDmaFd, int *pDstDmaFd)
+int NX_GlDeinterlaceRun(void *pHandle, int *pSrcDmaFd, int *pSrcNDmaFd, int *pDstDmaFd)
 {
 	GL_RUN_PARAM param;
 	param.pHandle   = pHandle;
 	param.pSrcDmaFd = pSrcDmaFd;
+	param.pSrcNDmaFd = pSrcNDmaFd;
 	param.pDstDmaFd = pDstDmaFd;
 	param.option    = 0;
 	return GLServiceRun( SERVICE_ID_DEINTERLACE, &param );
@@ -103,6 +109,15 @@ void NX_GlDeinterlaceDeInit(void *pHandle)
 	GL_CLOSE_PARAM param;
 	param.pHandle = pHandle;
 	GLServiceClose( SERVICE_ID_DEINTERLACE, &param );
+}
+
+int NX_GlDeinterlaceMotion(void *pHandle, int *pSrcDmaFds, int *pSrcNDmaFds)
+{
+	GL_MOTION_PARAM param;
+	param.pHandle   = pHandle;
+	param.pSrcDmaFds = pSrcDmaFds;
+	param.pSrcNDmaFds = pSrcNDmaFds;
+	return GLServiceMotion( SERVICE_ID_DEINTERLACE, &param );
 }
 
 //////////////////////////////////////////////////////////////////////////////

@@ -17,27 +17,26 @@
 #define __NX_GPU_SURF_H__
 
 /*
-[Main feature]
+[Main feature] 
 	Format converter using GPU.
 	Mem_to_Mem, Mem_to_Display operation.
-
+	
 [Usage]
 	1. From Memory
 		1) Mem to Mem
 		    - src format : NX_GSURF_VMEM_IMAGE_FORMAT_YUV420, NX_GSURF_VMEM_IMAGE_FORMAT_NX_GSURF_VMEM_IMAGE_FORMAT_YUV420M, NX_GSURF_VMEM_IMAGE_FORMAT_RGBA
 			- dst format : NX_GSURF_VMEM_IMAGE_FORMAT_NV21, NX_GSURF_VMEM_IMAGE_FORMAT_NV12, NX_GSURF_VMEM_IMAGE_FORMAT_YUV422, NX_GSURF_VMEM_IMAGE_FORMAT_YUV420
-			- If src format is NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_INTERLACE then dst format is NX_GSURF_VMEM_IMAGE_FORMAT_YUV420.
+			- If src format is NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_INTERLACE then dst format is NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_INTERLACE.
 		2) Mem to Display
 		    - src format : NX_GSURF_VMEM_IMAGE_FORMAT_YUV420, NX_GSURF_VMEM_IMAGE_FORMAT_NX_GSURF_VMEM_IMAGE_FORMAT_YUV420M, NX_GSURF_VMEM_IMAGE_FORMAT_RGBA
-			- dst format : NX_GSURF_VMEM_IMAGE_FORMAT_YUV422
-
+			- dst format : NX_GSURF_VMEM_IMAGE_FORMAT_YUV422		
 	2. From 4Camera
 		1) 4Cam to Mem
 			- src format : NX_GSURF_VMEM_IMAGE_FORMAT_YUV420
 			- dst format : NX_GSURF_VMEM_IMAGE_FORMAT_NV21, NX_GSURF_VMEM_IMAGE_FORMAT_NV12, NX_GSURF_VMEM_IMAGE_FORMAT_YUV422, NX_GSURF_VMEM_IMAGE_FORMAT_YUV420
 		2) 4Cam to Display
 			- src format : NX_GSURF_VMEM_IMAGE_FORMAT_YUV420
-			- dst format : NX_GSURF_VMEM_IMAGE_FORMAT_YUV422
+			- dst format : NX_GSURF_VMEM_IMAGE_FORMAT_YUV422	
 
 [Sequeunce]
 	1. Create and Init. (nxGSurfaceCreate, nxGSurfaceInitEGL, nxGSurfaceInitGL, nxGSurfaceCreateSource4ch, nxGSurfaceCreateTarget)
@@ -46,7 +45,7 @@
 	   User process can start with callback argument. (NXRenderInfo)
 
 [Format performance]
-	1. src YUV420, dst YUV422       (One rendering, The fastest)
+	1. src YUV420, dst YUV422       (One rendering, The fastest) 
 	2. src RGBA,   dst RGBA         (One rendering)
 	3. src YUV420, dst YUV420       (Three rendering)
 	   src YUV420, dst NV21 or NV12 (Two rendering, Time is alomot the same with the YUV420)
@@ -67,7 +66,7 @@
 //------------------------------------------------------------------------------
 //
 //    Includes
-//
+//    
 //------------------------------------------------------------------------------
 #include <base_interface.h>
 #include <EGL/egl.h>
@@ -80,17 +79,19 @@
 //------------------------------------------------------------------------------
 //
 //    Defines
-//
+//    
 //------------------------------------------------------------------------------
 typedef void* HGSURFSOURCE;
 typedef void* HGSURFTARGET;
+typedef void* HGSURFMOTIONCTRL;
+typedef void* HGSURFDATA;
 typedef void* HGSURFCTRL;
 
 //---------------------------------------------------------
 //    1Channel Rotate  (only for memory source, not camera)
 //---------------------------------------------------------
 typedef enum{
-	NX_GSURF_ROTATE_O,
+	NX_GSURF_ROTATE_O,		
 	NX_GSURF_ROTATE_90,
 	NX_GSURF_ROTATE_180,
 	NX_GSURF_ROTATE_270,
@@ -115,29 +116,40 @@ typedef enum
 //    VMEM Format
 //---------------------------------------------------------
 typedef enum{
-	NX_GSURF_VMEM_IMAGE_FORMAT_RGBA,   	 /* target: display, mem, 			source: mem */
+	NX_GSURF_VMEM_IMAGE_FORMAT_RGBA,   	 			/* target: display, mem, 		source: mem */
 	/* NX_GSURF_VMEM_IMAGE_FORMAT_YUV420 support 'seperated fd' and 'non-seperated fd' both. */
-	NX_GSURF_VMEM_IMAGE_FORMAT_YUV420, 	 /* target: mem, 				source: mem, 4camera */
-	NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_INTERLACE,	/* target: mem, 				source: mem */
-	NX_GSURF_VMEM_IMAGE_FORMAT_YUV422, 	 /* target: display, mem, 		source not supported */
-	NX_GSURF_VMEM_IMAGE_FORMAT_NV12,   	 /* target: mem, 				source not supported */
-	NX_GSURF_VMEM_IMAGE_FORMAT_NV21,   	 /* target: mem, 				source not supported */
-	NX_GSURF_VMEM_IMAGE_FORMAT_UV,	   	 /* target not supported, 		source not supported */
-	NX_GSURF_VMEM_IMAGE_FORMAT_Y,	     /* target not supported, 		source not supported */
-	NX_GSURF_VMEM_IMAGE_FORMAT_U,	     /* target not supported, 		source not supported */
-	NX_GSURF_VMEM_IMAGE_FORMAT_V,	     /* target not supported, 		source not supported */
+	NX_GSURF_VMEM_IMAGE_FORMAT_YUV420, 	 			/* target: mem, 				source: mem, 4camera */
+	NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_INTERLACE,    /* target: mem, 				source: mem */
+	NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_EVEN_ODD_INTERLACE,    /* target: mem, 				source: mem */
+	NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_ODD_EVEN_INTERLACE,    /* target: mem, 				source: mem */
+	NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_MOTION_INTERLACE,      /* target: mem, 				source: mem */
+	NX_GSURF_VMEM_IMAGE_FORMAT_YUV422, 	 			/* target: display, mem, 		source not supported */
+	NX_GSURF_VMEM_IMAGE_FORMAT_NV12,   	 			/* target: mem, 				source not supported */
+	NX_GSURF_VMEM_IMAGE_FORMAT_NV21,   	 			/* target: mem, 				source not supported */
+	NX_GSURF_VMEM_IMAGE_FORMAT_UV,	   	 			/* target not supported, 		source not supported */
+	NX_GSURF_VMEM_IMAGE_FORMAT_Y,	     			/* target not supported, 		source not supported */
+	NX_GSURF_VMEM_IMAGE_FORMAT_U,	     			/* target not supported, 		source not supported */
+	NX_GSURF_VMEM_IMAGE_FORMAT_V,	     			/* target not supported, 		source not supported */	
 	NX_GSURF_VMEM_IMAGE_FORMAT_MAX
 }NX_GSURF_VMEM_IMAGE_FORMAT_MODE;
+/*
+NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_EVEN_ODD_INTERLACE : 
+ first  : curr even pass, curr odd blend 
+ second : curr odd pass, next even blend  
+NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_ODD_EVEN_INTERLACE
+ first  : curr odd pass, curr even blend 
+ second : curr even pass, next odd blend  
+*/
 
 //---------------------------------------------------------
-//    Structure defines
+//    Structure defines  
 //---------------------------------------------------------
 typedef struct tagNXDisplayRect
 {
     unsigned int    x;
     unsigned int    y;
     unsigned int    width;
-    unsigned int    height;
+    unsigned int    height; 
 } NXDisplayRect;
 
 typedef struct tag_DISPLAY_INFO
@@ -146,7 +158,7 @@ typedef struct tag_DISPLAY_INFO
     unsigned int    crtcID;
     unsigned int    planeID;
 	unsigned int	width;		//GL Render target width
-	unsigned int	height;		//GL Render target height
+	unsigned int	height;		//GL Render target height	    
     NXDisplayRect 	dspDstRect; //LCD H/W size
     NXDisplayRect 	dspSrcRect; //GL Render target
 } NXDisplayInfo;
@@ -159,7 +171,7 @@ typedef struct tagNXRenderInfo
     HGSURFTARGET htarget; //used user htarget (destination display mode => NULL)
 } NXRenderInfo;
 
-typedef void (* NX_GSURF_DONE_CALLBACK)(NXRenderInfo* prend_info);
+typedef void (* NX_GSURF_DONE_CALLBACK)(NXRenderInfo* prend_info); 
 
 
 
@@ -167,21 +179,21 @@ typedef void (* NX_GSURF_DONE_CALLBACK)(NXRenderInfo* prend_info);
 //
 //    Functions
 //    Caution: This API is not thread-safe!
-//
+//    
 //------------------------------------------------------------------------------
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 //
-// target_queue_cnt : Semaphore for target is created as target_queue_cnt. But it effects only when target is display.
+// target_queue_cnt : Semaphore for target is created as target_queue_cnt. But it effects only when target is display. 
 // display_en : Target can be display.
 // camera_en : Source can be 4 channel camera.
 //
-NX_APICALL HGSURFCTRL nxGSurfaceCreate(unsigned int target_queue_cnt, NX_BOOL display_en,
+NX_APICALL HGSURFCTRL nxGSurfaceCreate(unsigned int target_queue_cnt, NX_BOOL display_en, 
 	unsigned int cam_stride, unsigned int cam_width, unsigned int cam_height, unsigned int cam_cnt, unsigned int cam_module, NX_BOOL camera_en);
 //
-//
+// 
 //
 NX_APICALL void  nxGSurfaceDestroy(HGSURFCTRL hgsurf_ctrl);
 //
@@ -212,7 +224,7 @@ NX_APICALL void  nxGSurfaceDestroy(HGSURFCTRL hgsurf_ctrl);
 // |_______|
 //
 //  720 * 1280 YUV420 => width_align chould be 32X.
-//
+//  _________
 // |       | |
 // |   Y   | |
 // |_______|_|
@@ -226,15 +238,15 @@ NX_APICALL NX_BOOL nxGSurfaceInitEGL(HGSURFCTRL hgsurf_ctrl, NXDisplayInfo* pdis
 		NX_GSURF_VMEM_IMAGE_FORMAT_MODE source_format, unsigned int source_width_align, unsigned int source_height_align,
 		NX_GSURF_VMEM_IMAGE_FORMAT_MODE target_format, unsigned int target_width_align, unsigned int target_height_align);
 //
-//
+// 
 //
 NX_APICALL void nxGSurfaceDeinitEGL(HGSURFCTRL hgsurf_ctrl);
 //
-//
+// 
 //
 NX_APICALL NX_BOOL nxGSurfaceInitGL(HGSURFCTRL hgsurf_ctrl, HGSURFTARGET htarget);
 //
-//
+// 
 //
 NX_APICALL void nxGSurfaceDeinitGL(HGSURFCTRL hgsurf_ctrl);
 //
@@ -245,7 +257,6 @@ NX_APICALL HGSURFSOURCE nxGSurfaceCreateSource(HGSURFCTRL hgsurf_ctrl, unsigned 
 // source for memory with single dma_fd for deinterlace.
 //
 NX_APICALL HGSURFSOURCE nxGSurfaceCreateDeinterlaceSource(HGSURFCTRL hgsurf_ctrl, unsigned int src_width, unsigned int src_height, int src_dma_fd);
-
 //
 // source for memory with Y,U,V sperated dam_fd.
 //
@@ -259,31 +270,31 @@ NX_APICALL HGSURFSOURCE nxGSurfaceCreateDeinterlaceSourceWithFDs(HGSURFCTRL hgsu
 //
 NX_APICALL HGSURFSOURCE nxGSurfaceCreateSource4ch(HGSURFCTRL hgsurf_ctrl, unsigned int src_stride, unsigned int src_width, unsigned int src_height, int src_dma_fd);
 //
-//
+// 
 //
 NX_APICALL void nxGSurfaceDestroySource(HGSURFCTRL hgsurf_ctrl, HGSURFSOURCE hsource);
 //
-//
+// 
 //
 NX_APICALL HGSURFTARGET nxGSurfaceCreateTarget(HGSURFCTRL hgsurf_ctrl, unsigned int dst_width, unsigned int dst_height, int dst_dma_fd);
 //
 // target for deinterlace.
 //
 NX_APICALL HGSURFTARGET nxGSurfaceCreateDeinterlaceTarget(HGSURFCTRL hgsurf_ctrl, unsigned int dst_width, unsigned int dst_height, int dst_dma_fd);
-
 //
 // This is used with nxGSurfaceRenderAll4ChToEachImages().
 //
 NX_APICALL HGSURFTARGET nxGSurfaceCreateTargetEglImages(HGSURFCTRL hgsurf_ctrl, unsigned int dst_width, unsigned int dst_height, int* dst_dma_fds);
 //
-//
+// 
 //
 NX_APICALL HGSURFTARGET nxGSurfaceCreateTargetWithFDs(HGSURFCTRL hgsurf_ctrl, unsigned int dst_width, unsigned int dst_height, int* pdst_dma_fd);
 //
+// 
 //
 NX_APICALL HGSURFTARGET nxGSurfaceCreateDeinterlaceTargetWithFDs(HGSURFCTRL hgsurf_ctrl, unsigned int dst_width, unsigned int dst_height, int* pdst_dma_fd);
 //
-//
+// 
 //
 NX_APICALL void nxGSurfaceDestroyTarget(HGSURFCTRL hgsurf_ctrl, HGSURFTARGET htarget);
 //
@@ -291,9 +302,17 @@ NX_APICALL void nxGSurfaceDestroyTarget(HGSURFCTRL hgsurf_ctrl, HGSURFTARGET hta
 //
 NX_APICALL void nxGSurfaceDestroyTargetEglImages(HGSURFCTRL hgsurf_ctrl, HGSURFTARGET htarget);
 //
+// meta data for memory with single dma_fd.
+//
+NX_APICALL HGSURFMOTIONCTRL nxGSurfaceCreateMotionData(HGSURFCTRL hgsurf_ctrl, unsigned int src_width, unsigned int src_height, int src_dma_fd0, int src_dma_fd1);
+//
+// meta data for memory with single dma_fd.
+//
+NX_APICALL void nxGSurfaceDestroyMotionData(HGSURFCTRL hgsurf_ctrl, HGSURFMOTIONCTRL hdata);
+//
 // texture is memory
 // all target format : 30fps
-//
+// 
 NX_APICALL NX_BOOL nxGSurfaceRender(HGSURFCTRL hgsurf_ctrl, HGSURFSOURCE hsource, HGSURFTARGET htarget, NX_GSURF_ROTATE_MODE rotate_mode);
 //
 // texture is one of 4ch cameras, ch_mode < NX_GSURF_DIRECTION_MAX (ch0 or 1 or 2 or 3 => one image)
@@ -317,10 +336,35 @@ NX_APICALL NX_BOOL nxGSurfaceRenderAll4ChToEachImages(HGSURFCTRL hgsurf_ctrl, HG
 //
 // run deinterlace, resizing is possible.
 // target YUV420_INTERLACE : 30fps, 12ms(FHD)
+// support NX_GSURF_DEINTERLACE_MODE_EVEN_ONLY only.
 //
-NX_APICALL NX_BOOL nxGSurfaceRenderDeinterlace(HGSURFCTRL hgsurf_ctrl, HGSURFSOURCE hsource, HGSURFTARGET htarget);
+NX_APICALL NX_BOOL nxGSurfaceRenderDeinterlace(HGSURFCTRL hgsurf_ctrl, HGSURFSOURCE hsource, HGSURFTARGET htarget); 
+//
+// 1920x1080 : 12ms
+// 1440x1080 : 9ms
+// If hsource_next is NULL then the Deinterlace use hsource_curr only.
+//
+NX_APICALL NX_BOOL nxGSurfaceRenderEvenOddDeinterlace(HGSURFCTRL hgsurf_ctrl, HGSURFSOURCE hsource_curr, HGSURFSOURCE hsource_next, HGSURFTARGET htarget); 
 //
 //
+//
+NX_APICALL NX_BOOL nxGSurfaceRenderMotionData(HGSURFCTRL hgsurf_ctrl, HGSURFSOURCE hsource_curr, HGSURFSOURCE hsource_next, HGSURFMOTIONCTRL hmotion_ctrl); 
+//
+// 1440x1080 : 23ms
+// If hsource_next is NULL then the Deinterlace use EOE sequence. Or OEO sequence.
+//
+NX_APICALL NX_BOOL nxGSurfaceRenderMotionDeinterlace(HGSURFCTRL hgsurf_ctrl, HGSURFSOURCE hsource_curr, HGSURFSOURCE hsource_next, 
+			HGSURFMOTIONCTRL hmotion_ctrl, HGSURFTARGET htarget, float y_motion_strength, float uv_motion_strength); 
+//
+// create reference texture.
+//
+NX_APICALL NX_BOOL nxGSurfaceReadyDeinterlace(HGSURFCTRL hgsurf_ctrl, HGSURFMOTIONCTRL hmotion_ctrl);
+//
+// destroy reference texture.
+//
+NX_APICALL void nxGSurfaceReleaseDeinterlace(HGSURFCTRL hgsurf_ctrl, HGSURFMOTIONCTRL hmotion_ctrl);
+//
+// only for displaying.
 //
 NX_APICALL void nxGSurfaceUpdate(HGSURFCTRL hgsurf_ctrl);
 //
@@ -333,15 +377,15 @@ NX_APICALL void nxGSurfaceSetDoneCallback(HGSURFCTRL hgsurf_ctrl, NX_GSURF_DONE_
 //
 NX_APICALL void nxGSurfaceStop(HGSURFCTRL hgsurf_ctrl);
 //
-//
+// 
 //
 NX_APICALL void nxGSurfaceMakeCurrent(HGSURFCTRL hgsurf_ctrl, EGLSurface surface, unsigned int plane);
 //
-//
+// 
 //
 NX_APICALL EGLSurface nxGSurfaceGetSurface(HGSURFTARGET htarget, unsigned int chidx, unsigned int plane);
 //
-//
+// 
 //
 NX_APICALL void nxGSurfaceGetSize(HGSURFTARGET htarget, unsigned int* pwidth, unsigned int* pheight);
 

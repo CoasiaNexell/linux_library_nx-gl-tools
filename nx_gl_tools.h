@@ -48,6 +48,9 @@ enum
 	NX_ROTATE_MAX
 };
 
+#define DEINT_MODE_MIXING	0
+#define	DEINT_MODE_ADAPTIVE	1
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -98,24 +101,39 @@ void NX_GlRotateDeInit(void *pHandle);
 * @param[in]		srcHeight			source height
 * @param[in]		dstWidth			destination width
 * @param[in]		dstHeight			destination height
-* @param[in]		(*pDstDmaFd)[3]			destination dmaFd
-* @param[in]		srcImageFormat			source imageFormat
-* @param[in]		dstOutBufNum			destination buffer number
+* @param[in]		(*pDstDmaFd)[3]		destination dmaFd
+* @param[in]		srcImageFormat		source imageFormat
+* @param[in]		dstOutBufNum		destination buffer number
+* @param[in]		mode				deinterlace mode (def:0)
+* @param[in]		motionFds			motion buffer's fds
+* @param[in]		coeff				co-efficient ( 1.5 ~ 3.0, def 2.5 )
 * @return if not null on success(handle), null on failure
 */
 void *NX_GlDeinterlaceInit(unsigned int srcWidth, unsigned int srcHeight,
 						   unsigned int dstWidth, unsigned int dstHeight,
-						   int (*pDstDmaFd)[3], int srcImageFormat, int dstOutBufNum);
+						   int (*pDstDmaFd)[3], int srcImageFormat, int dstOutBufNum,
+						   int mode, int motionFds[2], float coeff);
+
+/**
+* NX_GlDeinterlaceMotion.
+*
+* @param[in]		*pHandle			handle
+* @param[in]		*pSrcDmaFds			current frame's DMA fds
+* @param[in]		*pSrcNDmaFds		next frame's DMA fds
+* @return 0 on success, negative error on failure
+*/
+int NX_GlDeinterlaceMotion(void *pHandle, int *pSrcDmaFds, int *pSrcNDmaFds);
 
 /**
 * NX_GlDeinterlaceRun.
 *
 * @param[in]		*pHandle			handle
-* @param[in]		*pSrcDmaFd			source height
-* @param[in]		*pDstDmaFd			destination width
+* @param[in]		*pSrcDmaFd			current frame's DMA fd
+* @param[in]		*pSrcNDmaFd			next frame's DMA fd
+* @param[in]		*pDstDmaFd			destination frame's DMA fd
 * @return 0 on success, negative error on failure
 */
-int NX_GlDeinterlaceRun(void *pHandle, int *pSrcDmaFd, int *pDstDmaFd);
+int NX_GlDeinterlaceRun(void *pHandle, int *pSrcDmaFd, int *pSrcNDmaFd, int *pDstDmaFd);
 
 /**
 * NX_GlDeinterlaceDeInit.
