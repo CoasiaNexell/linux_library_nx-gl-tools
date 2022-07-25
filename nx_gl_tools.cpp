@@ -87,8 +87,11 @@ void *NX_GlDeinterlaceInit( unsigned int srcWidth, unsigned int srcHeight,
 	param.srcImageFormat = srcImageFormat;
 	param.dstOutBufNum   = dstOutBufNum;
 	param.mode           = mode;
-	param.motionFds[0]   = motionFds[0];
-	param.motionFds[1]   = motionFds[1];
+	if( motionFds )
+	{
+		param.motionFds[0]   = motionFds[0];
+		param.motionFds[1]   = motionFds[1];
+	}
 	param.coeff          = coeff;
 	return GLServiceOpen( SERVICE_ID_DEINTERLACE, &param );
 }

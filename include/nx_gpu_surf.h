@@ -123,6 +123,7 @@ typedef enum{
 	NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_EVEN_ODD_INTERLACE,    /* target: mem, 				source: mem */
 	NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_ODD_EVEN_INTERLACE,    /* target: mem, 				source: mem */
 	NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_MOTION_INTERLACE,      /* target: mem, 				source: mem */
+	NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_ALL_INTERLACE,      	 /* target: mem, 				source: mem */
 	NX_GSURF_VMEM_IMAGE_FORMAT_YUV422, 	 			/* target: display, mem, 		source not supported */
 	NX_GSURF_VMEM_IMAGE_FORMAT_NV12,   	 			/* target: mem, 				source not supported */
 	NX_GSURF_VMEM_IMAGE_FORMAT_NV21,   	 			/* target: mem, 				source not supported */
@@ -133,12 +134,14 @@ typedef enum{
 	NX_GSURF_VMEM_IMAGE_FORMAT_MAX
 }NX_GSURF_VMEM_IMAGE_FORMAT_MODE;
 /*
-NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_EVEN_ODD_INTERLACE : 
+NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_EVEN_ODD_INTERLACE : (Don't use. Use NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_MOTION_INTERLACE)
  first  : curr even pass, curr odd blend 
  second : curr odd pass, next even blend  
-NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_ODD_EVEN_INTERLACE
+NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_ODD_EVEN_INTERLACE : (Don't use. Use NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_MOTION_INTERLACE)
  first  : curr odd pass, curr even blend 
  second : curr even pass, next odd blend  
+NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_ALL_INTERLACE :
+ both NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_INTERLACE and NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_MOTION_INTERLACE enable
 */
 
 //---------------------------------------------------------
@@ -282,6 +285,10 @@ NX_APICALL HGSURFTARGET nxGSurfaceCreateTarget(HGSURFCTRL hgsurf_ctrl, unsigned 
 //
 NX_APICALL HGSURFTARGET nxGSurfaceCreateDeinterlaceTarget(HGSURFCTRL hgsurf_ctrl, unsigned int dst_width, unsigned int dst_height, int dst_dma_fd);
 //
+// target for deinterlace.
+//
+NX_APICALL HGSURFTARGET nxGSurfaceCreateDeinterlaceTargetWithSingleFD(HGSURFCTRL hgsurf_ctrl, unsigned int dst_width, unsigned int dst_height, int dst_dma_fd);
+//
 // This is used with nxGSurfaceRenderAll4ChToEachImages().
 //
 NX_APICALL HGSURFTARGET nxGSurfaceCreateTargetEglImages(HGSURFCTRL hgsurf_ctrl, unsigned int dst_width, unsigned int dst_height, int* dst_dma_fds);
@@ -337,20 +344,23 @@ NX_APICALL NX_BOOL nxGSurfaceRenderAll4ChToEachImages(HGSURFCTRL hgsurf_ctrl, HG
 // run deinterlace, resizing is possible.
 // target YUV420_INTERLACE : 30fps, 12ms(FHD)
 // support NX_GSURF_DEINTERLACE_MODE_EVEN_ONLY only.
+// Use nxGSurfaceRenderMotionDeinterlace() for 60fps
 //
 NX_APICALL NX_BOOL nxGSurfaceRenderDeinterlace(HGSURFCTRL hgsurf_ctrl, HGSURFSOURCE hsource, HGSURFTARGET htarget); 
 //
 // 1920x1080 : 12ms
 // 1440x1080 : 9ms
 // If hsource_next is NULL then the Deinterlace use hsource_curr only.
+// Caution! Don't use this. Use nxGSurfaceRenderMotionDeinterlace() instead of this for performance.
 //
 NX_APICALL NX_BOOL nxGSurfaceRenderEvenOddDeinterlace(HGSURFCTRL hgsurf_ctrl, HGSURFSOURCE hsource_curr, HGSURFSOURCE hsource_next, HGSURFTARGET htarget); 
 //
-//
+// used with nxGSurfaceRenderMotionDeinterlace() for 60fps
 //
 NX_APICALL NX_BOOL nxGSurfaceRenderMotionData(HGSURFCTRL hgsurf_ctrl, HGSURFSOURCE hsource_curr, HGSURFSOURCE hsource_next, HGSURFMOTIONCTRL hmotion_ctrl); 
 //
-// 1440x1080 : 23ms
+// 1440x1080 : 400Mhz 2EA of 60fps, 17.3ms (motion1EA + deinterlace 2EA). Best
+// 1440x1080 : 300Mhz 2EA of 60fps, 21.6ms (motion1EA + deinterlace 2EA). Best
 // If hsource_next is NULL then the Deinterlace use EOE sequence. Or OEO sequence.
 //
 NX_APICALL NX_BOOL nxGSurfaceRenderMotionDeinterlace(HGSURFCTRL hgsurf_ctrl, HGSURFSOURCE hsource_curr, HGSURFSOURCE hsource_next, 

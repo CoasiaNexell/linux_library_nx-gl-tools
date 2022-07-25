@@ -254,8 +254,8 @@ static void *GLServiceDeinterlaceOpen(GL_OPEN_PARAM  *param)
 {
 	int32_t bRet;
 
-	NX_GSURF_VMEM_IMAGE_FORMAT_MODE glSrcFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_MOTION_INTERLACE;
-	NX_GSURF_VMEM_IMAGE_FORMAT_MODE glDstFormat = NX_GSURF_VMEM_IMAGE_FORMAT_YUV420_MOTION_INTERLACE;
+	NX_GSURF_VMEM_IMAGE_FORMAT_MODE glSrcFormat = NX_GSURF_VMEM_IMAGE_FORMAT_MAX;
+	NX_GSURF_VMEM_IMAGE_FORMAT_MODE glDstFormat = NX_GSURF_VMEM_IMAGE_FORMAT_MAX;
 
 	NX_GL_HANDLE *hDeint = (NX_GL_HANDLE *)malloc(sizeof(NX_GL_HANDLE));
 
@@ -347,6 +347,11 @@ static void *GLServiceDeinterlaceOpen(GL_OPEN_PARAM  *param)
 
 		//	Ready Deinterlace
 		nxGSurfaceReadyDeinterlace(hDeint->ghAppGSurfCtrl, hDeint->ghAppGSurfMotion);
+	}
+	else
+	{
+		//	Ready Deinterlace
+		nxGSurfaceReadyDeinterlace(hDeint->ghAppGSurfCtrl, NULL);
 	}
 
 	return (void *)hDeint;
@@ -442,6 +447,10 @@ static void GLServiceDeinterlaceClose ( GL_CLOSE_PARAM *param )
 	if( hDeint->mode == DEINT_MODE_ADAPTIVE )
 	{
 		nxGSurfaceReleaseDeinterlace(hDeint->ghAppGSurfCtrl, hDeint->ghAppGSurfMotion);
+	}
+	else
+	{
+		nxGSurfaceReleaseDeinterlace(hDeint->ghAppGSurfCtrl, NULL);
 	}
 
 	//destroy GSurf source handle

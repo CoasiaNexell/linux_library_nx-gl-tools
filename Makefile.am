@@ -9,7 +9,7 @@ DEFS += \
 
 libnx_gl_tools_la_LDFLAGS = \
 	-ldrm -lnx_v4l2 -lnx_renderer \
-	-L./lib/linux/${ARCH_TYPE_NUM} -lnxgpusurf
+	-L./lib/linux/${ARCH_TYPE_NUM} -lnxgpusurf -lMali
 
 libnx_gl_tools_la_LTLIBRARIES = libnx_gl_tools.la
 libnx_gl_tools_ladir = ${libdir}
